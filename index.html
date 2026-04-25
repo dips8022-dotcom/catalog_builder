@@ -165,6 +165,9 @@ body { font-family: Arial, 'Noto Sans KR', sans-serif; background: #e0e0dc; colo
 .page-header-logotext { font-family: Arial, 'DM Serif Display', serif; font-size: 17px; letter-spacing: 2px; text-transform: uppercase; color: var(--primary); }
 .page-header-spacer { flex: 1; }
 .page-header-title { font-size: 10px; letter-spacing: 2px; text-transform: uppercase; color: var(--muted); font-family: Arial, sans-serif; }
+.pdf-title-editable { outline: none; cursor: text; min-width: 60px; border-bottom: 1px dashed transparent; transition: border-color .15s; }
+.pdf-title-editable:hover, .pdf-title-editable:focus { border-bottom-color: var(--muted); }
+.pdf-title-editable:empty::before { content: attr(data-placeholder); opacity: .4; }
 .page-body { flex: 1; padding: 40px 50px; display: flex; flex-direction: column; }
 .page-sec-title { font-family: Arial, 'DM Serif Display', serif; font-size: 26px; color: var(--primary); margin-bottom: 8px; outline: none; }
 .page-sec-divider { width: 40px; height: 2px; margin-bottom: 20px; }
@@ -602,14 +605,18 @@ function buildImagePage(pg, idx) {
 
   let imgHtml = '';
 
+  const _imgH_side = pg.imageHeight !== undefined ? pg.imageHeight : 320;
+  const _imgH_grid = pg.imageHeight !== undefined ? pg.imageHeight : (layout === '1' ? 280 : layout === '3' ? 160 : 200);
+  const _imgFit = pg.imageFit || 'cover';
+
   if (layout === 'img-left' || layout === 'img-right') {
     // ── Side-by-side: image + text ──
     const src = imgs[0] || null;
     const cap = captions[0] || '';
     const imgBlock = `<div class="pg-img-side">
       ${src
-        ? `<img src="${src}" alt="">`
-        : `<div class="pg-img-empty"><span style="font-size:28px;opacity:.25;">🖼</span><span style="font-size:11px;color:#bbb;">이미지를 업로드하세요</span></div>`}
+        ? `<img src="${src}" alt="" style="height:${_imgH_side}px;object-fit:${_imgFit};">`
+        : `<div class="pg-img-empty" style="height:${_imgH_side}px;"><span style="font-size:28px;opacity:.25;">🖼</span><span style="font-size:11px;color:#bbb;">이미지를 업로드하세요</span></div>`}
       ${cap ? `<div class="pg-img-caption">${esc(cap)}</div>` : ''}
     </div>`;
     const hasSideTitle = pg.sideTitle && pg.sideTitle.trim();
@@ -644,9 +651,9 @@ function buildImagePage(pg, idx) {
       const cap = captions[i] || '';
       gridHtml += `<div class="pg-img-item">`;
       if (src) {
-        gridHtml += `<img src="${src}" alt="">`;
+        gridHtml += `<img src="${src}" alt="" style="height:${_imgH_grid}px;object-fit:${_imgFit};">`;
       } else {
-        gridHtml += `<div style="width:100%;height:${layout==='1'?'280px':'200px'};background:#f0efe9;border-radius:2px;display:flex;align-items:center;justify-content:center;flex-direction:column;gap:8px;border:1.5px dashed #ddd;">
+        gridHtml += `<div style="width:100%;height:${_imgH_grid}px;background:#f0efe9;border-radius:2px;display:flex;align-items:center;justify-content:center;flex-direction:column;gap:8px;border:1.5px dashed #ddd;">
           <span style="font-size:28px;opacity:.25;">🖼</span>
           <span style="font-size:11px;color:#bbb;">이미지를 업로드하세요</span>
         </div>`;
@@ -674,8 +681,18 @@ function buildImagePage(pg, idx) {
 function buildPdfPage(pg, idx) {
   const div = document.createElement('div');
   div.className = 'pdf-img-page';
+  const logo = state.logo
+    ? `<img class="page-header-logo" src="${state.logo}" alt="logo">`
+    : `<div class="page-header-logotext">${esc(state.companyName)}</div>`;
   div.innerHTML = `
-    ${headerHtml(pg.title)}
+    <div class="page-header" style="border-bottom-color:${state.borderColor||'#e2e2da'}">
+      ${logo}
+      <div class="page-header-spacer"></div>
+      <div class="page-header-title pdf-title-editable"
+        contenteditable="true" spellcheck="false"
+        data-placeholder="제목 입력"
+        onblur="onTitleBlur('${pg.id}',this)">${esc(pg.title)}</div>
+    </div>
     <div class="pdf-img-body"></div>
     ${footerHtml(idx+3)}`;
   const body = div.querySelector('.pdf-img-body');
@@ -726,7 +743,7 @@ function footerHtml(num) {
 
 function onTitleBlur(id, el) {
   const pg = state.pages.find(p=>p.id===id);
-  if (pg) { pg.title = el.innerText.trim(); renderSidebar(); }
+  if (pg) { pg.title = el.innerText.trim(); renderSidebar(); renderPanel(); }
 }
 function onBodyBlur(id, el) {
   const pg = state.pages.find(p=>p.id===id);
@@ -905,12 +922,27 @@ function buildImagePanel(pg) {
       <div class="field-label">${isSideLayout ? '이미지' : `이미지 ${i+1}`}</div>
       <div class="img-slot" style="height:${src?'auto':'80px'}" onclick="triggerImgUpload(${idx},${i})">
         ${src
-          ? `<img src="${src}" style="width:100%;max-height:120px;object-fit:cover;"><button class="img-slot-del" onclick="removeImg(event,${idx},${i})">✕</button>`
+          ? `<img src="${src}" style="width:100%;max-height:200px;object-fit:contain;display:block;"><button class="img-slot-del" onclick="removeImg(event,${idx},${i})">✕</button>`
           : `<div class="img-slot-empty"><div class="img-slot-icon">🖼</div><div class="img-slot-label">클릭하여 업로드</div></div>`}
       </div>
       <input class="img-caption-input" placeholder="이미지 설명 (선택)" value="${esc(captions[i]||'')}" oninput="state.pages[${idx}].captions[${i}]=this.value;renderCanvas()">
     </div>`;
   }
+
+  // image height & fit controls
+  const defaultH = isSideLayout ? 320 : layout === '1' ? 280 : layout === '3' ? 160 : 200;
+  const curH = pg.imageHeight !== undefined ? pg.imageHeight : defaultH;
+  const curFit = pg.imageFit || 'cover';
+  slotsHtml += `
+    <div class="field-label" style="margin-top:8px;">이미지 높이 <span id="imgH_${idx}" style="float:right;font-weight:400;color:#888;">${curH}px</span></div>
+    <input type="range" style="width:100%;accent-color:var(--primary);margin-bottom:8px;"
+      min="80" max="600" step="10" value="${curH}"
+      oninput="setImgHeight(${idx},+this.value)">
+    <div class="field-label">이미지 맞춤</div>
+    <div class="img-layout-row" style="margin-bottom:4px;">
+      <button class="img-layout-btn${curFit==='cover'?' active':''}" onclick="setImgFit(${idx},'cover')">채우기</button>
+      <button class="img-layout-btn${curFit==='contain'?' active':''}" onclick="setImgFit(${idx},'contain')">맞춤</button>
+    </div>`;
 
   // side-layout text fields
   const sideTextHtml = isSideLayout ? `
@@ -1079,6 +1111,25 @@ function setImgLayout(pageIdx, layout) {
   // init side text fields if needed
   if (isSide && pg.sideTitle === undefined) pg.sideTitle = '';
   if (isSide && !pg.sideBody) pg.sideBody = '텍스트를 입력하세요.\n\n제품 설명, 특징, 사양 등을 자유롭게 작성하세요.';
+  // reset height to layout default when layout changes
+  delete pg.imageHeight;
+  renderCanvas();
+  renderPanel();
+}
+
+function setImgHeight(pageIdx, h) {
+  const pg = state.pages[pageIdx];
+  if (!pg) return;
+  pg.imageHeight = h;
+  const el = document.getElementById('imgH_' + pageIdx);
+  if (el) el.textContent = h + 'px';
+  renderCanvas();
+}
+
+function setImgFit(pageIdx, fit) {
+  const pg = state.pages[pageIdx];
+  if (!pg) return;
+  pg.imageFit = fit;
   renderCanvas();
   renderPanel();
 }
