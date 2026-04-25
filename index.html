@@ -5,7 +5,8 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Catalog Builder</title>
 <!-- PDF export -->
-<script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
 <!-- PDF.js for import -->
 <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
 <style>
@@ -1271,54 +1272,65 @@ function onLoadFileSelect(input) {
 // ────────────────────────────────────────
 async function exportPDF() {
   showToast('PDF 생성 중... 잠시 기다려주세요');
-  const wrap = document.createElement('div');
-  wrap.style.cssText = 'position:absolute;top:0;left:0;width:794px;font-family:\'Noto Sans KR\',sans-serif;z-index:-9999;pointer-events:none;';
-  document.body.appendChild(wrap);
 
-  const st = document.createElement('style');
-  st.textContent = document.querySelector('style').textContent;
-  wrap.appendChild(st);
-
-  const allPageEls = [
-    buildCover(),
-    buildToc(),
-    ...state.pages.map((pg,i) => {
-      if (pg.type === 'pdf') return buildPdfPage(pg, i);
-      if (pg.type === 'image') return buildImagePage(pg, i);
-      return buildTextPage(pg, i);
-    }),
-    buildContact()
-  ];
-
-  allPageEls.forEach(el => {
-    el.style.cssText = 'page-break-after:always;width:794px;min-height:1123px;position:relative;overflow:hidden;background:white;';
-    wrap.appendChild(el);
-  });
-
-  // 이미지가 모두 로드될 때까지 대기
-  await Promise.all(
-    Array.from(wrap.querySelectorAll('img')).map(img =>
-      img.complete ? Promise.resolve() :
-      new Promise(r => { img.onload = r; img.onerror = r; })
-    )
-  );
-
-  const opt = {
-    margin: 0,
-    filename: `${state.projectName||'catalog'}.pdf`,
-    image: { type: 'jpeg', quality: 0.92 },
-    html2canvas: { scale: 2, useCORS: true, allowTaint: true, logging: false, width: 794, windowWidth: 794, scrollX: 0, scrollY: 0 },
-    jsPDF: { unit: 'px', format: [794, 1123], orientation: 'portrait', hotfixes: ['px_scaling'] },
-    pagebreak: { mode: 'css' }
-  };
+  // 생성 중 오버레이 (화면 덮기)
+  const overlay = document.createElement('div');
+  overlay.style.cssText = 'position:fixed;inset:0;background:#1c1c2e;z-index:10000;display:flex;align-items:center;justify-content:center;flex-direction:column;gap:12px;';
+  overlay.innerHTML = '<div style="color:white;font-size:13px;letter-spacing:2px;text-transform:uppercase;">PDF 생성 중...</div><div id="exportProg" style="color:rgba(255,255,255,.5);font-size:11px;"></div>';
+  document.body.appendChild(overlay);
 
   try {
-    await html2pdf().set(opt).from(wrap).save();
+    const { jsPDF } = window.jspdf;
+    const doc = new jsPDF({ unit: 'px', format: [794, 1123], orientation: 'portrait', compress: true });
+
+    const builders = [
+      () => buildCover(),
+      () => buildToc(),
+      ...state.pages.map((pg, i) => () => {
+        if (pg.type === 'pdf') return buildPdfPage(pg, i);
+        if (pg.type === 'image') return buildImagePage(pg, i);
+        return buildTextPage(pg, i);
+      }),
+      () => buildContact()
+    ];
+
+    for (let i = 0; i < builders.length; i++) {
+      document.getElementById('exportProg').textContent = `${i + 1} / ${builders.length} 페이지`;
+
+      const el = builders[i]();
+      // 페이지를 화면에 올려 html2canvas가 정상 렌더링하도록 함 (오버레이가 가림)
+      el.style.cssText = 'position:fixed;top:0;left:0;width:794px;height:1123px;background:white;z-index:9999;overflow:hidden;';
+      document.body.appendChild(el);
+
+      // 이미지 로드 완료 대기
+      await Promise.all(Array.from(el.querySelectorAll('img')).map(img =>
+        img.complete ? Promise.resolve() :
+        new Promise(r => { img.onload = r; img.onerror = r; })
+      ));
+
+      // 브라우저 렌더링 사이클 2회 대기
+      await new Promise(r => requestAnimationFrame(() => requestAnimationFrame(r)));
+
+      const canvas = await html2canvas(el, {
+        scale: 2, useCORS: true, allowTaint: true, logging: false,
+        width: 794, height: 1123,
+        windowWidth: 794, windowHeight: 1123,
+        scrollX: 0, scrollY: 0,
+        ignoreElements: node => node === overlay
+      });
+
+      document.body.removeChild(el);
+
+      if (i > 0) doc.addPage([794, 1123]);
+      doc.addImage(canvas.toDataURL('image/jpeg', 0.92), 'JPEG', 0, 0, 794, 1123);
+    }
+
+    doc.save(`${state.projectName || 'catalog'}.pdf`);
     showToast('PDF 다운로드 완료! ✓');
-  } catch(e) {
+  } catch (e) {
     alert('PDF 생성 오류: ' + e.message);
   } finally {
-    document.body.removeChild(wrap);
+    document.body.removeChild(overlay);
   }
 }
 
