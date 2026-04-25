@@ -622,8 +622,7 @@ function buildImagePage(pg, idx) {
   let imgHtml = '';
 
   const _imgH_side = pg.imageHeight !== undefined ? pg.imageHeight : 320;
-  const _imgH_grid = pg.imageHeight !== undefined ? pg.imageHeight :
-    (layout === '1' ? 280 : layout === '3' || layout === '3b' ? 150 : layout === '2b' ? 170 : 200);
+  const _imgH_grid = pg.imageHeight !== undefined ? pg.imageHeight : defaultImgH(layout);
   const _imgFit = pg.imageFit || 'cover';
 
   if (layout === 'img-left' || layout === 'img-right') {
@@ -692,6 +691,39 @@ function buildImagePage(pg, idx) {
         ${pg.bodyBottom ? `<div class="page-content-area" style="margin-top:16px;" contenteditable="true" spellcheck="false" onblur="onBodyBottomBlur('${pg.id}',this)">${esc(pg.bodyBottom)}</div>` : ''}
       </div>
       ${footerHtml(idx+3)}`;
+
+  } else if (/^\d+x\d+$/.test(layout)) {
+    // ── NxM 격자 (R행 × C열) ──
+    const [rows, cols] = layout.split('x').map(Number);
+    const mkItem = (src, cap, h) => {
+      let html = '<div class="pg-img-item">';
+      html += src
+        ? `<img src="${src}" alt="" style="height:${h}px;object-fit:${_imgFit};">`
+        : `<div style="width:100%;height:${h}px;background:#f0efe9;border-radius:2px;display:flex;align-items:center;justify-content:center;flex-direction:column;gap:8px;border:1.5px dashed #ddd;"><span style="font-size:28px;opacity:.25;">🖼</span><span style="font-size:11px;color:#bbb;">이미지를 업로드하세요</span></div>`;
+      if (cap) html += `<div class="pg-img-caption">${esc(cap)}</div>`;
+      return html + '</div>';
+    };
+    let gridHtml = '<div style="display:flex;flex-direction:column;gap:14px;">';
+    for (let r = 0; r < rows; r++) {
+      gridHtml += '<div style="display:flex;gap:14px;">';
+      for (let c = 0; c < cols; c++) {
+        const i = r * cols + c;
+        gridHtml += mkItem(imgs[i], captions[i] || '', _imgH_grid);
+      }
+      gridHtml += '</div>';
+    }
+    gridHtml += '</div>';
+    div.innerHTML = `
+      ${headerHtml(pg.title)}
+      <div class="page-body">
+        <div class="page-sec-title" contenteditable="true" spellcheck="false" onblur="onTitleBlur('${pg.id}',this)">${esc(pg.title)}</div>
+        <div class="page-sec-divider" style="background:${state.accentColor}"></div>
+        ${pg.body ? `<div class="page-content-area" style="margin-bottom:16px;" contenteditable="true" spellcheck="false" onblur="onBodyBlur('${pg.id}',this)">${esc(pg.body)}</div>` : ''}
+        ${gridHtml}
+        ${pg.bodyBottom ? `<div class="page-content-area" style="margin-top:16px;" contenteditable="true" spellcheck="false" onblur="onBodyBottomBlur('${pg.id}',this)">${esc(pg.bodyBottom)}</div>` : ''}
+      </div>
+      ${footerHtml(idx+3)}`;
+
   } else {
     // ── Grid layouts: 1 / 2 / 3 images ──
     let gridHtml = `<div class="pg-images layout-${layout}">`;
@@ -947,10 +979,16 @@ function buildImagePanel(pg) {
     { key: '1',         label: '1장\n전체' },
     { key: '2',         label: '2장\n나란히' },
     { key: '3',         label: '3장\n격자' },
-    { key: '2b',        label: '2장+\n하단 1장' },
-    { key: '3b',        label: '3장+\n하단 1장' },
-    { key: 'img-left',  label: '🖼 왼쪽\n글 오른쪽' },
-    { key: 'img-right', label: '글 왼쪽\n🖼 오른쪽' },
+    { key: '2b',        label: '2장+\n하단1장' },
+    { key: '3b',        label: '3장+\n하단1장' },
+    { key: '2x1',       label: '1장×\n2단' },
+    { key: '2x2',       label: '2장×\n2단' },
+    { key: '2x3',       label: '3장×\n2단' },
+    { key: '3x1',       label: '1장×\n3단' },
+    { key: '3x2',       label: '2장×\n3단' },
+    { key: '3x3',       label: '3장×\n3단' },
+    { key: 'img-left',  label: '🖼왼쪽\n글오른쪽' },
+    { key: 'img-right', label: '글왼쪽\n🖼오른쪽' },
   ];
 
   const layoutBtns = `
@@ -980,7 +1018,7 @@ function buildImagePanel(pg) {
   }
 
   // image height & fit controls
-  const defaultH = isSideLayout ? 320 : layout === '1' ? 280 : layout === '3' || layout === '3b' ? 150 : layout === '2b' ? 170 : 200;
+  const defaultH = isSideLayout ? 320 : defaultImgH(layout);
   const curH = pg.imageHeight !== undefined ? pg.imageHeight : defaultH;
   const curFit = pg.imageFit || 'cover';
   slotsHtml += `
@@ -1215,7 +1253,24 @@ function layoutSlotCount(layout) {
   if (layout === 'img-left' || layout === 'img-right') return 1;
   if (layout === '2b') return 3;
   if (layout === '3b') return 4;
+  const m = layout.match(/^(\d+)x(\d+)$/);
+  if (m) return parseInt(m[1]) * parseInt(m[2]);
   return parseInt(layout);
+}
+
+function defaultImgH(layout) {
+  if (layout === '1') return 280;
+  if (layout === '2') return 200;
+  if (layout === '3') return 150;
+  if (layout === '2b') return 170;
+  if (layout === '3b') return 150;
+  if (layout === 'img-left' || layout === 'img-right') return 320;
+  const m = layout.match(/^(\d+)x(\d+)$/);
+  if (m) {
+    const total = parseInt(m[1]) * parseInt(m[2]);
+    return total <= 2 ? 260 : total <= 4 ? 185 : total <= 6 ? 145 : 110;
+  }
+  return 200;
 }
 
 function setImgLayout(pageIdx, layout) {
