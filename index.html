@@ -1,0 +1,1336 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Catalog Builder</title>
+<!-- PDF export -->
+<script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js"></script>
+<!-- PDF.js for import -->
+<script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
+<style>
+@import url('https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@300;400;500;700&family=DM+Serif+Display&display=swap');
+
+:root {
+  --primary: #1c1c2e;
+  --accent: #c0392b;
+  --accent2: #e74c3c;
+  --mid: #2a2a40;
+  --light: #f4f4f0;
+  --lighter: #fafaf8;
+  --border: #e2e2da;
+  --text: #2c2c2c;
+  --muted: #999;
+  --sidebar-w: 190px;
+  --panel-w: 300px;
+  --page-w: 794px;
+  --page-h: 1123px;
+}
+
+* { box-sizing: border-box; margin: 0; padding: 0; }
+body { font-family: Arial, 'Noto Sans KR', sans-serif; background: #e0e0dc; color: var(--text); height: 100vh; display: flex; flex-direction: column; overflow: hidden; }
+
+/* TOPBAR */
+.topbar { height: 50px; background: var(--primary); display: flex; align-items: center; padding: 0 14px; gap: 8px; flex-shrink: 0; z-index: 200; }
+.topbar-logo { font-family: 'DM Serif Display', serif; font-size: 16px; color: white; letter-spacing: 3px; text-transform: uppercase; margin-right: 8px; flex-shrink: 0; }
+.sep { width: 1px; height: 24px; background: rgba(255,255,255,.12); margin: 0 4px; }
+.tb-btn { padding: 6px 13px; background: rgba(255,255,255,.09); color: rgba(255,255,255,.88); border: 1px solid rgba(255,255,255,.15); border-radius: 2px; font-size: 11px; letter-spacing: .8px; cursor: pointer; font-family: inherit; transition: all .15s; text-transform: uppercase; white-space: nowrap; flex-shrink: 0; }
+.tb-btn:hover { background: rgba(255,255,255,.18); }
+.tb-btn.red { background: var(--accent); border-color: var(--accent2); }
+.tb-btn.red:hover { background: var(--accent2); }
+.tb-btn.blue { background: #2471a3; border-color: #2980b9; }
+.tb-btn.blue:hover { background: #2980b9; }
+.tb-spacer { flex: 1; }
+.tb-project { font-size: 11px; color: rgba(255,255,255,.35); max-width: 200px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+
+/* WORKSPACE */
+.workspace { display: flex; flex: 1; overflow: hidden; }
+
+/* SIDEBAR */
+.sidebar { width: var(--sidebar-w); background: #14142a; overflow-y: auto; flex-shrink: 0; padding: 10px 7px; display: flex; flex-direction: column; gap: 5px; }
+.sidebar-title { font-size: 9px; letter-spacing: 2px; text-transform: uppercase; color: rgba(255,255,255,.25); padding: 2px 5px 6px; }
+.page-item { background: #f0efe9; border-radius: 2px; cursor: pointer; border: 2px solid transparent; transition: border-color .12s; overflow: hidden; position: relative; }
+.page-item:hover { border-color: rgba(255,255,255,.35); }
+.page-item.active { border-color: var(--accent); }
+.page-thumb-wrap { aspect-ratio: 210/297; overflow: hidden; background: white; }
+.mini { width: 100%; height: 100%; display: flex; flex-direction: column; overflow: hidden; }
+.mini-cover { flex: 1; display: flex; flex-direction: column; align-items: center; justify-content: center; padding: 6px; text-align: center; }
+.mc-title { font-size: 4px; color: white; font-weight: 700; letter-spacing: 1px; word-break: break-all; }
+.mc-sub { font-size: 3px; color: rgba(255,255,255,.5); margin-top: 2px; }
+.mini-content { flex: 1; display: flex; flex-direction: column; background: white; }
+.mini-header-bar { height: 8px; background: var(--primary); display: flex; align-items: center; padding: 0 4px; }
+.mini-header-dot { width: 3px; height: 3px; background: white; border-radius: 50%; opacity: .6; }
+.mini-body { flex: 1; padding: 3px 4px; overflow: hidden; }
+.mini-line { height: 2px; background: #e0e0d8; border-radius: 1px; margin-bottom: 2px; }
+.mini-line.s { width: 60%; }
+.mini-img-placeholder { width: 100%; height: 18px; background: #e8e8e8; border-radius: 1px; margin-top: 2px; display: flex; align-items: center; justify-content: center; }
+.mini-footer-bar { height: 6px; background: #f0efe9; border-top: 1px solid #e0e0d8; }
+.mini-toc { flex: 1; background: white; padding: 4px; display: flex; flex-direction: column; }
+.mini-toc-title { height: 3px; width: 40%; background: var(--primary); border-radius: 1px; margin-bottom: 3px; }
+.mini-toc-row { display: flex; align-items: center; gap: 2px; margin-bottom: 2px; }
+.mini-toc-dot { width: 2px; height: 2px; background: var(--accent); border-radius: 50%; flex-shrink: 0; }
+.mini-toc-line { height: 2px; background: #ddd; border-radius: 1px; flex: 1; }
+.mini-contact { flex: 1; background: white; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 3px; padding: 4px; }
+.mini-contact-bar { width: 20px; height: 2px; background: var(--accent); border-radius: 1px; }
+.mini-contact-line { height: 2px; width: 70%; background: #e0e0d8; border-radius: 1px; }
+.mini-pdf-img { width: 100%; height: 100%; object-fit: cover; }
+
+.page-tag { position: absolute; bottom: 0; left: 0; right: 0; background: rgba(0,0,0,.7); color: white; font-size: 8px; padding: 3px 5px; display: flex; justify-content: space-between; align-items: center; }
+.page-tag span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.page-del { color: rgba(255,100,100,.7); cursor: pointer; flex-shrink: 0; }
+.page-del:hover { color: #e74c3c; }
+.add-page-btn { width: 100%; padding: 7px; border: 1.5px dashed rgba(255,255,255,.15); background: none; color: rgba(255,255,255,.35); border-radius: 2px; font-size: 10px; cursor: pointer; font-family: inherit; transition: all .15s; letter-spacing: 1px; margin-top: 2px; }
+.add-page-btn:hover { border-color: rgba(255,255,255,.45); color: rgba(255,255,255,.65); }
+
+/* CANVAS */
+.canvas-area { flex: 1; overflow: auto; display: flex; align-items: flex-start; justify-content: center; padding: 30px 20px; background: #d8d8d4; }
+.page-canvas { width: var(--page-w); min-height: var(--page-h); background: white; box-shadow: 0 8px 40px rgba(0,0,0,.25); flex-shrink: 0; display: flex; flex-direction: column; }
+
+/* RIGHT PANEL */
+.panel { width: var(--panel-w); background: var(--lighter); border-left: 1px solid var(--border); overflow-y: auto; flex-shrink: 0; }
+.panel-section { padding: 16px; border-bottom: 1px solid var(--border); }
+.panel-heading { font-size: 10px; letter-spacing: 2px; text-transform: uppercase; color: var(--muted); margin-bottom: 12px; font-weight: 500; }
+.field-label { font-size: 11px; color: #555; margin-bottom: 4px; font-weight: 500; }
+.field-input { width: 100%; padding: 8px 10px; border: 1.5px solid var(--border); border-radius: 2px; font-size: 13px; font-family: inherit; outline: none; transition: border-color .15s; background: white; margin-bottom: 10px; }
+.field-input:focus { border-color: var(--primary); }
+.field-textarea { width: 100%; padding: 8px 10px; border: 1.5px solid var(--border); border-radius: 2px; font-size: 13px; font-family: inherit; outline: none; transition: border-color .15s; background: white; resize: vertical; min-height: 70px; margin-bottom: 10px; }
+.field-textarea:focus { border-color: var(--primary); }
+.field-hint { font-size: 10px; color: var(--muted); margin-bottom: 10px; line-height: 1.5; }
+.field-select { width: 100%; padding: 8px 10px; border: 1.5px solid var(--border); border-radius: 2px; font-size: 13px; font-family: inherit; outline: none; background: white; margin-bottom: 10px; cursor: pointer; }
+
+.color-row { display: flex; gap: 6px; flex-wrap: wrap; margin-bottom: 10px; }
+.color-swatch { width: 24px; height: 24px; border-radius: 50%; cursor: pointer; border: 2px solid transparent; transition: all .12s; }
+.color-swatch.active { border-color: #333 !important; transform: scale(1.15); }
+.color-pick-wrap { display: flex; align-items: center; gap: 8px; margin-bottom: 10px; }
+.color-pick-wrap input[type=color] { width: 34px; height: 28px; border: 1.5px solid var(--border); border-radius: 2px; cursor: pointer; padding: 2px; background: white; }
+
+.logo-upload-area { border: 1.5px dashed var(--border); border-radius: 2px; padding: 14px; text-align: center; cursor: pointer; transition: border-color .15s; margin-bottom: 10px; }
+.logo-upload-area:hover { border-color: var(--primary); }
+.logo-preview { max-height: 56px; max-width: 100%; object-fit: contain; display: block; margin: 0 auto 6px; }
+.logo-hint { font-size: 11px; color: var(--muted); line-height: 1.5; }
+
+/* IMAGE SLOTS */
+.img-slot-wrap { margin-bottom: 10px; }
+.img-slot { border: 1.5px dashed var(--border); border-radius: 2px; overflow: hidden; position: relative; background: #f8f8f6; cursor: pointer; transition: border-color .15s; }
+.img-slot:hover { border-color: var(--primary); }
+.img-slot img { width: 100%; height: 100%; object-fit: cover; display: block; }
+.img-slot-empty { display: flex; flex-direction: column; align-items: center; justify-content: center; height: 80px; gap: 4px; }
+.img-slot-icon { font-size: 20px; opacity: .4; }
+.img-slot-label { font-size: 10px; color: var(--muted); letter-spacing: .5px; }
+.img-slot-del { position: absolute; top: 4px; right: 4px; background: rgba(0,0,0,.6); color: white; border: none; border-radius: 2px; width: 20px; height: 20px; font-size: 11px; cursor: pointer; display: flex; align-items: center; justify-content: center; }
+.img-slot-del:hover { background: var(--accent); }
+.img-layout-row { display: flex; gap: 6px; margin-bottom: 10px; }
+.img-layout-btn { flex: 1; padding: 6px 4px; border: 1.5px solid var(--border); border-radius: 2px; background: white; font-size: 10px; cursor: pointer; font-family: inherit; text-align: center; transition: all .12s; color: var(--text); }
+.img-layout-btn:hover { border-color: var(--primary); }
+.img-layout-btn.active { border-color: var(--primary); background: var(--primary); color: white; }
+.img-caption-input { width: 100%; padding: 6px 8px; border: 1.5px solid var(--border); border-radius: 2px; font-size: 11px; font-family: inherit; outline: none; margin-top: 4px; margin-bottom: 6px; }
+.img-caption-input:focus { border-color: var(--primary); }
+
+/* PDF IMPORT */
+.pdf-progress { background: var(--light); border-radius: 2px; padding: 12px; margin-bottom: 10px; display: none; }
+.pdf-progress-bar-wrap { width: 100%; height: 4px; background: var(--border); border-radius: 2px; overflow: hidden; margin-top: 6px; }
+.pdf-progress-bar { height: 100%; background: var(--accent); border-radius: 2px; transition: width .3s; width: 0%; }
+.pdf-progress-text { font-size: 11px; color: var(--muted); }
+
+.toc-item-row { display: flex; gap: 5px; align-items: center; margin-bottom: 6px; }
+.toc-item-row input { flex: 1; padding: 7px 8px; border: 1.5px solid var(--border); border-radius: 2px; font-size: 12px; font-family: inherit; outline: none; }
+.toc-item-row input:focus { border-color: var(--primary); }
+.toc-pg-input { width: 44px !important; flex: none !important; text-align: center; }
+.toc-del-btn { width: 22px; height: 22px; background: none; border: none; cursor: pointer; color: #ccc; font-size: 13px; flex-shrink: 0; }
+.toc-del-btn:hover { color: var(--accent); }
+.toc-add-btn { width: 100%; padding: 7px; border: 1.5px dashed var(--border); background: none; color: var(--muted); border-radius: 2px; font-size: 11px; cursor: pointer; font-family: inherit; transition: all .15s; }
+.toc-add-btn:hover { border-color: var(--primary); color: var(--primary); }
+
+.apply-btn { width: 100%; padding: 9px; background: var(--primary); color: white; border: none; border-radius: 2px; font-size: 11px; letter-spacing: 1px; text-transform: uppercase; cursor: pointer; font-family: inherit; transition: background .15s; margin-top: 4px; }
+.apply-btn:hover { background: var(--mid); }
+
+/* PAGE LAYOUTS */
+.cover-page { flex: 1; display: flex; flex-direction: column; min-height: var(--page-h); position: relative; }
+.cover-bg { flex: 1; display: flex; flex-direction: column; align-items: flex-start; justify-content: center; padding: 90px 80px; position: relative; overflow: hidden; }
+.cover-accent-bar { position: absolute; top: 0; left: 0; width: 7px; height: 100%; }
+.cover-bottom-stripe { position: absolute; bottom: 0; left: 0; right: 0; height: 54px; background: rgba(0,0,0,.22); display: flex; align-items: center; padding: 0 80px; }
+.cover-eyebrow { font-size: 11px; letter-spacing: 4px; text-transform: uppercase; margin-bottom: 22px; opacity: .55; font-family: Arial, sans-serif; }
+.cover-title { font-family: Arial, 'DM Serif Display', serif; font-size: 50px; line-height: 1.15; margin-bottom: 18px; word-break: keep-all; }
+.cover-divider { width: 48px; height: 2px; margin-bottom: 22px; }
+.cover-subtitle { font-size: 16px; font-weight: 300; opacity: .78; margin-bottom: 56px; line-height: 1.7; white-space: pre-line; font-family: Arial, 'Noto Sans KR', sans-serif; }
+.cover-meta-row { font-size: 13px; font-weight: 300; opacity: .75; margin-bottom: 5px; font-family: Arial, 'Noto Sans KR', sans-serif; }
+.cover-meta-row strong { font-weight: 600; opacity: 1; }
+.cover-company-label { font-size: 11px; letter-spacing: 3px; text-transform: uppercase; color: rgba(255,255,255,.45); font-family: Arial, sans-serif; }
+
+/* content page */
+.content-page { flex: 1; display: flex; flex-direction: column; min-height: var(--page-h); }
+.page-header { height: 60px; display: flex; align-items: center; padding: 0 50px; border-bottom: 1px solid var(--border); flex-shrink: 0; }
+.page-header-logo { max-height: 36px; max-width: 160px; object-fit: contain; }
+.page-header-logotext { font-family: Arial, 'DM Serif Display', serif; font-size: 17px; letter-spacing: 2px; text-transform: uppercase; color: var(--primary); }
+.page-header-spacer { flex: 1; }
+.page-header-title { font-size: 10px; letter-spacing: 2px; text-transform: uppercase; color: var(--muted); font-family: Arial, sans-serif; }
+.page-body { flex: 1; padding: 40px 50px; display: flex; flex-direction: column; }
+.page-sec-title { font-family: Arial, 'DM Serif Display', serif; font-size: 26px; color: var(--primary); margin-bottom: 8px; outline: none; }
+.page-sec-divider { width: 40px; height: 2px; margin-bottom: 20px; }
+.page-content-area { font-size: 14px; line-height: 1.9; color: #444; outline: none; white-space: pre-wrap; font-family: Arial, 'Noto Sans KR', sans-serif; }
+.page-footer { height: 44px; display: flex; align-items: center; padding: 0 50px; border-top: 1px solid var(--border); flex-shrink: 0; font-size: 11px; color: var(--muted); font-family: Arial, 'Noto Sans KR', sans-serif; }
+.page-footer-l { flex: 1; }
+.page-footer-r { flex: 1; text-align: right; }
+
+/* image layouts within content page */
+.pg-images { margin: 18px 0; display: flex; gap: 14px; }
+.pg-images.layout-1 { flex-direction: column; }
+.pg-images.layout-2 { flex-direction: row; }
+.pg-images.layout-3 { flex-direction: row; flex-wrap: wrap; }
+/* left: image left, text right */
+.pg-images.layout-img-left { flex-direction: row; align-items: flex-start; gap: 28px; }
+.pg-images.layout-img-left .pg-img-side { flex: 0 0 55%; min-width: 0; display: flex; flex-direction: column; gap: 6px; }
+.pg-images.layout-img-left .pg-text-side { flex: 1; min-width: 0; display: flex; flex-direction: column; justify-content: flex-start; padding-top: 4px; }
+/* right: text left, image right */
+.pg-images.layout-img-right { flex-direction: row; align-items: flex-start; gap: 28px; }
+.pg-images.layout-img-right .pg-text-side { flex: 1; min-width: 0; display: flex; flex-direction: column; justify-content: flex-start; padding-top: 4px; }
+.pg-images.layout-img-right .pg-img-side { flex: 0 0 55%; min-width: 0; display: flex; flex-direction: column; gap: 6px; }
+
+.pg-img-item { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 6px; }
+.pg-img-item img { width: 100%; height: 200px; object-fit: cover; border-radius: 2px; display: block; }
+.pg-images.layout-1 .pg-img-item img { height: 280px; }
+.pg-images.layout-3 .pg-img-item { flex: 0 0 calc(33.333% - 10px); }
+.pg-images.layout-3 .pg-img-item img { height: 160px; }
+/* side layout image sizing */
+.pg-img-side img { width: 100%; height: 320px; object-fit: cover; border-radius: 2px; display: block; }
+.pg-img-side .pg-img-empty { width: 100%; height: 320px; background: #f0efe9; border-radius: 2px; display: flex; align-items: center; justify-content: center; flex-direction: column; gap: 8px; border: 1.5px dashed #ddd; }
+/* side text styling */
+.pg-text-side .pg-side-title { font-family: 'DM Serif Display', serif; font-size: 20px; color: var(--primary); margin-bottom: 10px; line-height: 1.3; outline: none; }
+.pg-text-side .pg-side-body { font-size: 13px; line-height: 1.9; color: #444; outline: none; white-space: pre-wrap; }
+.pg-text-side .pg-side-divider { width: 32px; height: 2px; margin-bottom: 14px; }
+
+.pg-img-caption { font-size: 11px; color: var(--muted); text-align: center; font-style: italic; }
+
+/* pdf-image page (full bleed between header & footer) */
+.pdf-img-page { flex: 1; display: flex; flex-direction: column; min-height: var(--page-h); }
+.pdf-img-body { flex: 1; overflow: hidden; display: flex; align-items: center; justify-content: center; background: #f8f8f6; }
+.pdf-img-body img { width: 100%; height: 100%; object-fit: contain; display: block; }
+
+/* toc */
+.toc-page { flex: 1; display: flex; flex-direction: column; min-height: var(--page-h); }
+.toc-body { flex: 1; padding: 70px 80px; }
+.toc-heading { font-family: Arial, 'DM Serif Display', serif; font-size: 38px; color: var(--primary); margin-bottom: 6px; }
+.toc-heading-sub { font-size: 11px; letter-spacing: 3px; text-transform: uppercase; color: var(--muted); margin-bottom: 40px; font-family: Arial, sans-serif; }
+.toc-entry { display: flex; align-items: baseline; padding: 13px 0; border-bottom: 1px solid var(--border); gap: 8px; font-family: Arial, 'Noto Sans KR', sans-serif; }
+.toc-entry:last-child { border-bottom: none; }
+.toc-entry-num { font-size: 11px; color: var(--accent); font-weight: 700; width: 26px; flex-shrink: 0; }
+.toc-entry-title { flex: 1; font-size: 15px; color: var(--text); }
+.toc-entry-dots { flex: 1; border-bottom: 1px dotted #ccc; height: 1px; margin-bottom: 3px; min-width: 20px; }
+.toc-entry-page { font-size: 13px; color: var(--muted); flex-shrink: 0; }
+
+/* contact */
+.contact-page { flex: 1; display: flex; flex-direction: column; min-height: var(--page-h); }
+.contact-body { flex: 1; padding: 80px; display: flex; flex-direction: column; justify-content: center; }
+.contact-heading { font-family: Arial, 'DM Serif Display', serif; font-size: 38px; color: var(--primary); margin-bottom: 6px; }
+.contact-heading-sub { font-size: 11px; letter-spacing: 3px; text-transform: uppercase; color: var(--muted); margin-bottom: 48px; font-family: Arial, sans-serif; }
+.contact-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 28px 40px; margin-bottom: 44px; }
+.contact-label { font-size: 10px; letter-spacing: 2px; text-transform: uppercase; color: var(--accent); margin-bottom: 6px; font-weight: 500; font-family: Arial, sans-serif; }
+.contact-value { font-size: 14px; color: var(--text); line-height: 1.8; font-family: Arial, 'Noto Sans KR', sans-serif; }
+.contact-divider { width: 100%; height: 1px; background: var(--border); margin: 32px 0; }
+.contact-co-name { font-family: Arial, 'DM Serif Display', serif; font-size: 24px; color: var(--primary); margin-bottom: 6px; }
+.contact-tagline { font-size: 13px; color: var(--muted); font-weight: 300; font-family: Arial, 'Noto Sans KR', sans-serif; }
+
+/* MODAL */
+.modal-bg { display: none; position: fixed; inset: 0; background: rgba(0,0,0,.6); z-index: 500; align-items: center; justify-content: center; }
+.modal-bg.open { display: flex; }
+.modal { background: white; border-radius: 3px; padding: 30px; width: 460px; box-shadow: 0 24px 60px rgba(0,0,0,.3); max-height: 90vh; overflow-y: auto; }
+.modal h3 { font-family: 'DM Serif Display', serif; font-size: 22px; color: var(--primary); margin-bottom: 18px; }
+.modal-subtitle { font-size: 12px; color: var(--muted); margin-bottom: 16px; line-height: 1.6; }
+.save-name-input { width: 100%; padding: 10px 12px; border: 1.5px solid var(--border); border-radius: 2px; font-size: 14px; font-family: inherit; outline: none; margin-bottom: 16px; }
+.save-name-input:focus { border-color: var(--primary); }
+.modal-list { list-style: none; max-height: 240px; overflow-y: auto; margin-bottom: 18px; }
+.modal-list li { padding: 10px 12px; border: 1px solid var(--border); border-radius: 2px; margin-bottom: 5px; display: flex; justify-content: space-between; align-items: center; cursor: pointer; transition: background .12s; }
+.modal-list li:hover { background: var(--light); }
+.save-name-text { font-size: 14px; color: var(--text); }
+.save-date-text { font-size: 11px; color: var(--muted); }
+.save-del-btn { color: #ccc; cursor: pointer; font-size: 15px; }
+.save-del-btn:hover { color: var(--accent); }
+.modal-empty { text-align: center; padding: 28px; color: var(--muted); font-size: 13px; }
+.modal-actions { display: flex; gap: 8px; justify-content: flex-end; }
+.modal-btn { padding: 8px 20px; border-radius: 2px; font-size: 12px; letter-spacing: 1px; text-transform: uppercase; cursor: pointer; font-family: inherit; border: none; transition: all .15s; }
+.modal-btn.cancel { background: var(--light); color: var(--text); }
+.modal-btn.cancel:hover { background: var(--border); }
+.modal-btn.primary { background: var(--primary); color: white; }
+.modal-btn.primary:hover { background: var(--mid); }
+
+/* PDF import modal specific */
+.pdf-drop-zone { border: 2px dashed var(--border); border-radius: 3px; padding: 36px 20px; text-align: center; cursor: pointer; transition: all .15s; margin-bottom: 16px; }
+.pdf-drop-zone:hover, .pdf-drop-zone.drag-over { border-color: var(--primary); background: var(--light); }
+.pdf-drop-icon { font-size: 32px; margin-bottom: 8px; }
+.pdf-drop-label { font-size: 14px; color: var(--text); margin-bottom: 4px; }
+.pdf-drop-sub { font-size: 11px; color: var(--muted); }
+.pdf-page-preview { display: grid; grid-template-columns: repeat(4, 1fr); gap: 8px; margin-bottom: 16px; max-height: 240px; overflow-y: auto; }
+.pdf-pg-thumb { position: relative; border: 2px solid var(--border); border-radius: 2px; overflow: hidden; cursor: pointer; aspect-ratio: 210/297; }
+.pdf-pg-thumb.selected { border-color: var(--accent); }
+.pdf-pg-thumb img { width: 100%; height: 100%; object-fit: cover; }
+.pdf-pg-thumb .pdf-pg-num { position: absolute; bottom: 0; left: 0; right: 0; background: rgba(0,0,0,.6); color: white; font-size: 9px; text-align: center; padding: 2px; }
+.pdf-pg-thumb .pdf-pg-check { position: absolute; top: 3px; right: 3px; width: 16px; height: 16px; background: var(--accent); color: white; border-radius: 50%; font-size: 9px; display: none; align-items: center; justify-content: center; }
+.pdf-pg-thumb.selected .pdf-pg-check { display: flex; }
+.pdf-select-all-row { display: flex; gap: 8px; margin-bottom: 10px; font-size: 12px; color: var(--muted); align-items: center; }
+.pdf-select-btn { padding: 4px 10px; border: 1px solid var(--border); border-radius: 2px; background: white; font-size: 11px; cursor: pointer; font-family: inherit; }
+.pdf-select-btn:hover { border-color: var(--primary); color: var(--primary); }
+.pdf-import-loading { text-align: center; padding: 20px; }
+.pdf-import-spinner { width: 32px; height: 32px; border: 3px solid var(--border); border-top-color: var(--primary); border-radius: 50%; animation: spin .8s linear infinite; margin: 0 auto 10px; }
+@keyframes spin { to { transform: rotate(360deg); } }
+
+/* TOAST */
+.toast { position: fixed; bottom: 24px; left: 50%; transform: translateX(-50%) translateY(16px); background: var(--primary); color: white; padding: 10px 22px; border-radius: 2px; font-size: 12px; opacity: 0; transition: all .3s; z-index: 9999; pointer-events: none; }
+.toast.show { opacity: 1; transform: translateX(-50%) translateY(0); }
+</style>
+</head>
+<body>
+
+<!-- TOPBAR -->
+<div class="topbar">
+  <div class="topbar-logo">Catalog</div>
+  <div class="sep"></div>
+  <button class="tb-btn" onclick="addContentPage()">+ 텍스트 페이지</button>
+  <button class="tb-btn" onclick="addImagePage()">🖼 이미지 페이지</button>
+  <button class="tb-btn blue" onclick="openPdfImportModal()">📄 PDF 가져오기</button>
+  <div class="sep"></div>
+  <button class="tb-btn" onclick="openSaveModal()">💾 저장</button>
+  <button class="tb-btn" onclick="openLoadModal()">📂 불러오기</button>
+  <div class="sep"></div>
+  <button class="tb-btn red" onclick="exportPDF()">⬇ PDF 내보내기</button>
+  <div class="tb-spacer"></div>
+  <div class="tb-project" id="projectLabel">새 카탈로그</div>
+</div>
+
+<div class="workspace">
+  <div class="sidebar" id="sidebar">
+    <div class="sidebar-title">페이지</div>
+    <button class="add-page-btn" onclick="addContentPage()">+ 페이지 추가</button>
+  </div>
+  <div class="canvas-area">
+    <div class="page-canvas" id="pageCanvas"></div>
+  </div>
+  <div class="panel" id="rightPanel"></div>
+</div>
+
+<!-- SAVE MODAL -->
+<div class="modal-bg" id="saveModal">
+  <div class="modal">
+    <h3>저장하기</h3>
+    <p class="modal-subtitle" style="font-size:12px;color:var(--muted);margin-bottom:14px;">파일 이름을 입력하면 <strong>.catalog.json</strong> 파일로 내 컴퓨터에 저장됩니다.</p>
+    <input class="save-name-input" id="saveNameInput" placeholder="저장 이름을 입력하세요..." />
+    <div class="modal-actions">
+      <button class="modal-btn cancel" onclick="closeSaveModal()">취소</button>
+      <button class="modal-btn primary" onclick="doSave()">저장</button>
+    </div>
+  </div>
+</div>
+
+<!-- LOAD MODAL -->
+<div class="modal-bg" id="loadModal">
+  <div class="modal" style="width:400px;">
+    <h3>파일 불러오기</h3>
+    <p class="modal-subtitle">저장해 두신 <strong>.catalog.json</strong> 파일을 선택하세요.<br>이미지와 모든 작업 내용이 그대로 복원됩니다.</p>
+    <div class="pdf-drop-zone" style="margin-bottom:16px;"
+      onclick="triggerLoadFile()"
+      ondragover="event.preventDefault();this.classList.add('drag-over')"
+      ondragleave="this.classList.remove('drag-over')"
+      ondrop="this.classList.remove('drag-over');onLoadFileDrop(event)">
+      <div class="pdf-drop-icon">📂</div>
+      <div class="pdf-drop-label">클릭하거나 파일을 끌어다 놓으세요</div>
+      <div class="pdf-drop-sub">.catalog.json 파일</div>
+    </div>
+    <input type="file" id="loadFileInput" style="display:none" accept=".json" onchange="onLoadFileSelect(this)">
+    <div class="modal-actions">
+      <button class="modal-btn cancel" onclick="closeLoadModal()">닫기</button>
+    </div>
+  </div>
+</div>
+
+<!-- PDF IMPORT MODAL -->
+<div class="modal-bg" id="pdfImportModal">
+  <div class="modal" style="width:520px;">
+    <h3>PDF 가져오기</h3>
+    <p class="modal-subtitle">PDF를 업로드하면 각 페이지를 이미지로 변환하여 카탈로그 페이지로 추가합니다.<br>헤더(회사 로고)와 푸터(페이지번호, 날짜, 고객명)는 자동으로 유지됩니다.</p>
+
+    <div id="pdfDropZone" class="pdf-drop-zone" onclick="document.getElementById('pdfFileInput').click()"
+      ondragover="onPdfDragOver(event)" ondragleave="onPdfDragLeave(event)" ondrop="onPdfDrop(event)">
+      <div class="pdf-drop-icon">📄</div>
+      <div class="pdf-drop-label">PDF 파일을 여기에 끌어다 놓거나 클릭하여 선택</div>
+      <div class="pdf-drop-sub">최대 50페이지 권장</div>
+    </div>
+    <input type="file" id="pdfFileInput" style="display:none" accept=".pdf" onchange="onPdfFileSelect(this)">
+
+    <div id="pdfImportLoading" class="pdf-import-loading" style="display:none;">
+      <div class="pdf-import-spinner"></div>
+      <div class="pdf-progress-text" id="pdfLoadingText">PDF 분석 중...</div>
+    </div>
+
+    <div id="pdfPageSelector" style="display:none;">
+      <div class="pdf-select-all-row">
+        <span id="pdfSelectedCount">0개 선택됨</span>
+        <button class="pdf-select-btn" onclick="selectAllPdfPages(true)">전체 선택</button>
+        <button class="pdf-select-btn" onclick="selectAllPdfPages(false)">전체 해제</button>
+      </div>
+      <div class="pdf-page-preview" id="pdfPageGrid"></div>
+    </div>
+
+    <div class="modal-actions">
+      <button class="modal-btn cancel" onclick="closePdfImportModal()">취소</button>
+      <button class="modal-btn primary" id="pdfImportBtn" onclick="doImportPdf()" style="display:none;">선택 페이지 추가</button>
+    </div>
+  </div>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<script>
+// ── PDF.js worker ──
+if (typeof pdfjsLib !== 'undefined') {
+  pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
+}
+
+// ────────────────────────────────────────
+// STATE
+// ────────────────────────────────────────
+let state = {
+  projectName: '새 카탈로그',
+  logo: null,
+  coverColor: '#1c1c2e',
+  accentColor: '#c0392b',
+  borderColor: '#e2e2da',
+  companyName: 'KAMI Co., Ltd.',
+  cover: {
+    eyebrow: 'Product Catalog',
+    title: '제품 카탈로그',
+    subtitle: '최고의 품질과 기술로\n고객의 성공을 지원합니다.',
+    date: todayStr(),
+    recipient: '',
+    recipientTitle: '',
+  },
+  toc: [
+    { title: '회사 소개', page: '3' },
+    { title: '제품 라인업', page: '4' },
+    { title: '기술 사양', page: '6' },
+    { title: '납품 사례', page: '8' },
+  ],
+  pages: [], // {id, type:'text'|'image'|'pdf', title, body?, images?[], imageLayout?, captions?[], pdfImage?}
+  contact: {
+    companyName: 'KAMI Co., Ltd.',
+    tagline: 'Leading Technology Provider',
+    tel: '+82-2-6670-4114',
+    fax: '+82-2-6670-4110',
+    email: 'info@kami.biz',
+    web: 'www.kami.biz',
+    address: '서울 금천구 가산디지털 1로 196, 1005호\n우)08502',
+    person: '담당자명 / 직책',
+  }
+};
+
+let currentPage = 'cover';
+
+// PDF import state
+let pdfImportPages = []; // [{canvas dataUrl, selected}]
+
+function todayStr() {
+  const d = new Date();
+  return `${d.getFullYear()}.${String(d.getMonth()+1).padStart(2,'0')}.${String(d.getDate()).padStart(2,'0')}`;
+}
+function uid() { return '_' + Math.random().toString(36).substr(2,9); }
+
+// ────────────────────────────────────────
+// INIT
+// ────────────────────────────────────────
+function init() {
+  state.pages.push({ id: uid(), type: 'text', title: '회사 소개', body: '여기에 회사 소개 내용을 입력하세요.\n\n캔버스에서 직접 클릭하여 편집하거나, 오른쪽 패널의 텍스트 상자에 입력하실 수 있습니다.' });
+  state.pages.push({ id: uid(), type: 'image', title: '제품 라인업', body: '', images: [null, null], imageLayout: '2', captions: ['', ''] });
+  render();
+}
+
+// ────────────────────────────────────────
+// RENDER
+// ────────────────────────────────────────
+function render() {
+  renderSidebar();
+  renderCanvas();
+  renderPanel();
+  document.getElementById('projectLabel').textContent = state.projectName;
+}
+
+// ── SIDEBAR ──
+function renderSidebar() {
+  const sb = document.getElementById('sidebar');
+  const addBtn = sb.querySelector('.add-page-btn');
+  sb.querySelectorAll('.page-item').forEach(e => e.remove());
+  const frag = document.createDocumentFragment();
+  getAllPages().forEach(p => {
+    const div = document.createElement('div');
+    div.className = 'page-item' + (currentPage === p.key ? ' active' : '');
+    div.onclick = () => { currentPage = p.key; render(); };
+    div.innerHTML = `
+      <div class="page-thumb-wrap"><div class="mini">${p.miniHtml}</div></div>
+      <div class="page-tag">
+        <span>${esc(p.label)}</span>
+        ${p.deletable ? `<span class="page-del" onclick="deletePage('${p.key}',event)">✕</span>` : ''}
+      </div>`;
+    frag.appendChild(div);
+  });
+  sb.insertBefore(frag, addBtn);
+}
+
+function getAllPages() {
+  const pages = [];
+  pages.push({
+    key: 'cover', label: '표지', deletable: false,
+    miniHtml: `<div class="mini-cover" style="background:${state.coverColor};flex:1;">
+      <div class="mc-title">${esc(state.cover.title)||'표지'}</div>
+      <div class="mc-sub">${esc(state.cover.date)}</div>
+    </div>`
+  });
+  pages.push({
+    key: 'toc', label: '목차', deletable: false,
+    miniHtml: `<div class="mini-toc">
+      <div class="mini-toc-title"></div>
+      ${state.toc.slice(0,5).map(()=>`<div class="mini-toc-row"><div class="mini-toc-dot"></div><div class="mini-toc-line"></div></div>`).join('')}
+    </div>`
+  });
+  state.pages.forEach((pg, i) => {
+    let bodyMini = '';
+    if (pg.type === 'pdf' && pg.pdfImage) {
+      bodyMini = `<img class="mini-pdf-img" src="${pg.pdfImage}">`;
+    } else if (pg.type === 'image') {
+      bodyMini = `<div class="mini-line s"></div><div class="mini-img-placeholder">🖼</div>`;
+    } else {
+      bodyMini = `<div class="mini-line s"></div><div class="mini-line"></div><div class="mini-line"></div>`;
+    }
+    pages.push({
+      key: i, label: `${i+3}p · ${pg.title||'페이지'}`, deletable: true,
+      miniHtml: pg.type === 'pdf' && pg.pdfImage
+        ? `<div class="mini-content" style="padding:0;"><div class="mini-header-bar"><div class="mini-header-dot"></div></div><div style="flex:1;overflow:hidden;"><img style="width:100%;height:100%;object-fit:cover;" src="${pg.pdfImage}"></div><div class="mini-footer-bar"></div></div>`
+        : `<div class="mini-content"><div class="mini-header-bar"><div class="mini-header-dot"></div></div><div class="mini-body">${bodyMini}</div><div class="mini-footer-bar"></div></div>`
+    });
+  });
+  pages.push({
+    key: 'contact', label: '연락처', deletable: false,
+    miniHtml: `<div class="mini-contact"><div class="mini-contact-bar"></div><div class="mini-contact-line"></div><div class="mini-contact-line" style="width:50%"></div><div class="mini-contact-line"></div></div>`
+  });
+  return pages;
+}
+
+// ── CANVAS ──
+function renderCanvas() {
+  const canvas = document.getElementById('pageCanvas');
+  canvas.innerHTML = '';
+  if (currentPage === 'cover') canvas.appendChild(buildCover());
+  else if (currentPage === 'toc') canvas.appendChild(buildToc());
+  else if (currentPage === 'contact') canvas.appendChild(buildContact());
+  else if (typeof currentPage === 'number') {
+    const pg = state.pages[currentPage];
+    if (pg) {
+      if (pg.type === 'pdf') canvas.appendChild(buildPdfPage(pg, currentPage));
+      else if (pg.type === 'image') canvas.appendChild(buildImagePage(pg, currentPage));
+      else canvas.appendChild(buildTextPage(pg, currentPage));
+    }
+  }
+}
+
+function buildCover() {
+  const c = state.cover;
+  const div = document.createElement('div');
+  div.className = 'cover-page';
+  const coverLogo = state.logo
+    ? `<div style="display:flex;justify-content:center;margin-bottom:32px;">
+        <img src="${state.logo}" style="max-height:80px;max-width:260px;object-fit:contain;${state.coverLogoColor==='original'?'':'filter:brightness(0) invert(1);opacity:.9;'}">
+       </div>`
+    : '';
+  div.innerHTML = `
+    <div class="cover-bg" style="background:${state.coverColor};color:white;flex:1;">
+      <div class="cover-accent-bar" style="background:${state.accentColor}"></div>
+      ${coverLogo}
+      <div class="cover-eyebrow">${esc(c.eyebrow)}</div>
+      <div class="cover-title">${esc(c.title)||'제목을 입력하세요'}</div>
+      <div class="cover-divider" style="background:${state.accentColor}"></div>
+      <div class="cover-subtitle">${esc(c.subtitle)}</div>
+      <div>
+        ${c.recipient?`<div class="cover-meta-row"><strong>수신:</strong> ${esc(c.recipient)}${c.recipientTitle?' / '+esc(c.recipientTitle):''}</div>`:''}
+        <div class="cover-meta-row"><strong>날짜:</strong> ${esc(c.date)}</div>
+        <div class="cover-meta-row"><strong>발신:</strong> ${esc(state.companyName)}</div>
+      </div>
+      <div class="cover-bottom-stripe"><span class="cover-company-label">${esc(state.companyName)}</span></div>
+    </div>`;
+  return div;
+}
+
+function buildToc() {
+  const div = document.createElement('div');
+  div.className = 'toc-page';
+  div.innerHTML = `
+    ${headerHtml('Table of Contents')}
+    <div class="toc-body">
+      <div class="toc-heading">목 차</div>
+      <div class="toc-heading-sub">Contents</div>
+      <div>${state.toc.map((t,i)=>`
+        <div class="toc-entry">
+          <span class="toc-entry-num">0${i+1}</span>
+          <span class="toc-entry-title">${esc(t.title)}</span>
+          <span class="toc-entry-dots"></span>
+          <span class="toc-entry-page">${esc(t.page)}</span>
+        </div>`).join('')}</div>
+    </div>
+    ${footerHtml(2)}`;
+  return div;
+}
+
+function buildTextPage(pg, idx) {
+  const div = document.createElement('div');
+  div.className = 'content-page';
+  div.innerHTML = `
+    ${headerHtml(pg.title)}
+    <div class="page-body">
+      <div class="page-sec-title" contenteditable="true" spellcheck="false" onblur="onTitleBlur('${pg.id}',this)">${esc(pg.title)}</div>
+      <div class="page-sec-divider" style="background:${state.accentColor}"></div>
+      <div class="page-content-area" contenteditable="true" spellcheck="false" onblur="onBodyBlur('${pg.id}',this)">${esc(pg.body)}</div>
+    </div>
+    ${footerHtml(idx+3)}`;
+  return div;
+}
+
+function buildImagePage(pg, idx) {
+  const div = document.createElement('div');
+  div.className = 'content-page';
+  const layout = pg.imageLayout || '2';
+  const imgs = pg.images || [];
+  const captions = pg.captions || [];
+
+  let imgHtml = '';
+
+  if (layout === 'img-left' || layout === 'img-right') {
+    // ── Side-by-side: image + text ──
+    const src = imgs[0] || null;
+    const cap = captions[0] || '';
+    const imgBlock = `<div class="pg-img-side">
+      ${src
+        ? `<img src="${src}" alt="">`
+        : `<div class="pg-img-empty"><span style="font-size:28px;opacity:.25;">🖼</span><span style="font-size:11px;color:#bbb;">이미지를 업로드하세요</span></div>`}
+      ${cap ? `<div class="pg-img-caption">${esc(cap)}</div>` : ''}
+    </div>`;
+    const hasSideTitle = pg.sideTitle && pg.sideTitle.trim();
+    const textBlock = `<div class="pg-text-side">
+      ${hasSideTitle ? `
+        <div class="pg-side-title" contenteditable="true" spellcheck="false" onblur="onSideTitleBlur('${pg.id}',this)">${esc(pg.sideTitle)}</div>
+        <div class="pg-side-divider" style="background:${state.accentColor}"></div>
+      ` : `
+        <div class="pg-side-title" contenteditable="true" spellcheck="false" onblur="onSideTitleBlur('${pg.id}',this)" style="display:none"></div>
+      `}
+      <div class="pg-side-body" contenteditable="true" spellcheck="false" onblur="onSideBodyBlur('${pg.id}',this)">${esc(pg.sideBody||'텍스트를 입력하세요.\n\n제품 설명, 특징, 사양 등을 자유롭게 작성하세요.')}</div>
+    </div>`;
+
+    imgHtml = `<div class="pg-images layout-${layout}" style="flex:1;">
+      ${layout === 'img-left' ? imgBlock + textBlock : textBlock + imgBlock}
+    </div>`;
+
+    div.innerHTML = `
+      ${headerHtml(pg.title)}
+      <div class="page-body" style="display:flex;flex-direction:column;">
+        <div class="page-sec-title" contenteditable="true" spellcheck="false" onblur="onTitleBlur('${pg.id}',this)">${esc(pg.title)}</div>
+        <div class="page-sec-divider" style="background:${state.accentColor}"></div>
+        ${imgHtml}
+      </div>
+      ${footerHtml(idx+3)}`;
+
+  } else {
+    // ── Grid layouts: 1 / 2 / 3 images ──
+    let gridHtml = `<div class="pg-images layout-${layout}">`;
+    for (let i = 0; i < parseInt(layout); i++) {
+      const src = imgs[i];
+      const cap = captions[i] || '';
+      gridHtml += `<div class="pg-img-item">`;
+      if (src) {
+        gridHtml += `<img src="${src}" alt="">`;
+      } else {
+        gridHtml += `<div style="width:100%;height:${layout==='1'?'280px':'200px'};background:#f0efe9;border-radius:2px;display:flex;align-items:center;justify-content:center;flex-direction:column;gap:8px;border:1.5px dashed #ddd;">
+          <span style="font-size:28px;opacity:.25;">🖼</span>
+          <span style="font-size:11px;color:#bbb;">이미지를 업로드하세요</span>
+        </div>`;
+      }
+      if (cap) gridHtml += `<div class="pg-img-caption">${esc(cap)}</div>`;
+      gridHtml += `</div>`;
+    }
+    gridHtml += '</div>';
+
+    div.innerHTML = `
+      ${headerHtml(pg.title)}
+      <div class="page-body">
+        <div class="page-sec-title" contenteditable="true" spellcheck="false" onblur="onTitleBlur('${pg.id}',this)">${esc(pg.title)}</div>
+        <div class="page-sec-divider" style="background:${state.accentColor}"></div>
+        ${pg.body ? `<div class="page-content-area" style="margin-bottom:16px;" contenteditable="true" spellcheck="false" onblur="onBodyBlur('${pg.id}',this)">${esc(pg.body)}</div>` : ''}
+        ${gridHtml}
+        ${pg.bodyBottom ? `<div class="page-content-area" style="margin-top:16px;" contenteditable="true" spellcheck="false" onblur="onBodyBottomBlur('${pg.id}',this)">${esc(pg.bodyBottom)}</div>` : ''}
+      </div>
+      ${footerHtml(idx+3)}`;
+  }
+
+  return div;
+}
+
+function buildPdfPage(pg, idx) {
+  const div = document.createElement('div');
+  div.className = 'pdf-img-page';
+  div.innerHTML = `
+    ${headerHtml(pg.title)}
+    <div class="pdf-img-body">
+      ${pg.pdfImage ? `<img src="${pg.pdfImage}" alt="${esc(pg.title)}">` : '<span style="color:#ccc;font-size:13px;">이미지 없음</span>'}
+    </div>
+    ${footerHtml(idx+3)}`;
+  return div;
+}
+
+function buildContact() {
+  const ct = state.contact;
+  const div = document.createElement('div');
+  div.className = 'contact-page';
+  div.innerHTML = `
+    <div class="contact-body">
+      <div class="contact-heading">연 락 처</div>
+      <div class="contact-heading-sub">Contact Information</div>
+      <div class="contact-grid">
+        <div><div class="contact-label">Tel</div><div class="contact-value">${esc(ct.tel)}</div></div>
+        <div><div class="contact-label">Fax</div><div class="contact-value">${esc(ct.fax)}</div></div>
+        <div><div class="contact-label">E-mail</div><div class="contact-value">${esc(ct.email)}</div></div>
+        <div><div class="contact-label">Website</div><div class="contact-value">${esc(ct.web)}</div></div>
+        <div><div class="contact-label">Address</div><div class="contact-value">${esc(ct.address)}</div></div>
+        <div><div class="contact-label">담당자</div><div class="contact-value">${esc(ct.person)}</div></div>
+      </div>
+      <div class="contact-divider"></div>
+      <div class="contact-co-name">${esc(ct.companyName)}</div>
+      <div class="contact-tagline">${esc(ct.tagline)}</div>
+    </div>
+    ${footerHtml(state.pages.length+3)}`;
+  return div;
+}
+
+function headerHtml(title) {
+  const logo = state.logo
+    ? `<img class="page-header-logo" src="${state.logo}" alt="logo">`
+    : `<div class="page-header-logotext">${esc(state.companyName)}</div>`;
+  return `<div class="page-header" style="border-bottom-color:${state.borderColor||'#e2e2da'}">${logo}<div class="page-header-spacer"></div><div class="page-header-title">${esc(title)}</div></div>`;
+}
+function footerHtml(num) {
+  const rec = state.cover.recipient ? ' · ' + esc(state.cover.recipient) : '';
+  return `<div class="page-footer" style="border-top-color:${state.borderColor||'#e2e2da'}"><div class="page-footer-l">${esc(state.companyName)}</div><div>${num}</div><div class="page-footer-r">${esc(state.cover.date)}${rec}</div></div>`;
+}
+
+function onTitleBlur(id, el) {
+  const pg = state.pages.find(p=>p.id===id);
+  if (pg) { pg.title = el.innerText.trim(); renderSidebar(); }
+}
+function onBodyBlur(id, el) {
+  const pg = state.pages.find(p=>p.id===id);
+  if (pg) pg.body = el.innerText;
+}
+function onSideTitleBlur(id, el) {
+  const pg = state.pages.find(p=>p.id===id);
+  if (pg) pg.sideTitle = el.innerText.trim();
+}
+function onSideBodyBlur(id, el) {
+  const pg = state.pages.find(p=>p.id===id);
+  if (pg) pg.sideBody = el.innerText;
+}
+function onBodyBottomBlur(id, el) {
+  const pg = state.pages.find(p=>p.id===id);
+  if (pg) pg.bodyBottom = el.innerText;
+}
+
+// ── RIGHT PANEL ──
+function renderPanel() {
+  const panel = document.getElementById('rightPanel');
+  panel.innerHTML = '';
+  if (currentPage === 'cover') panel.appendChild(buildCoverPanel());
+  else if (currentPage === 'toc') panel.appendChild(buildTocPanel());
+  else if (currentPage === 'contact') panel.appendChild(buildContactPanel());
+  else if (typeof currentPage === 'number') {
+    const pg = state.pages[currentPage];
+    if (!pg) return;
+    if (pg.type === 'pdf') panel.appendChild(buildPdfPanel(pg));
+    else if (pg.type === 'image') panel.appendChild(buildImagePanel(pg));
+    else panel.appendChild(buildTextPanel(pg));
+  }
+}
+
+function buildCoverPanel() {
+  const wrap = document.createElement('div');
+  const c = state.cover;
+  wrap.innerHTML = `
+    <div class="panel-section">
+      <div class="panel-heading">프로젝트 설정</div>
+      <div class="field-label">프로젝트 이름</div>
+      <input class="field-input" value="${esc(state.projectName)}" oninput="state.projectName=this.value;document.getElementById('projectLabel').textContent=this.value">
+      <div class="field-label">회사명 (전체 공통)</div>
+      <input class="field-input" value="${esc(state.companyName)}" oninput="state.companyName=this.value;renderCanvas()">
+    </div>
+    <div class="panel-section">
+      <div class="panel-heading">표지 내용</div>
+      <div class="field-label">상단 레이블</div>
+      <input class="field-input" value="${esc(c.eyebrow)}" oninput="state.cover.eyebrow=this.value;renderCanvas()">
+      <div class="field-label">제목</div>
+      <input class="field-input" value="${esc(c.title)}" oninput="state.cover.title=this.value;renderCanvas();renderSidebar()">
+      <div class="field-label">부제목</div>
+      <textarea class="field-textarea" rows="3" oninput="state.cover.subtitle=this.value;renderCanvas()">${esc(c.subtitle)}</textarea>
+      <div class="field-label">날짜</div>
+      <input class="field-input" value="${esc(c.date)}" oninput="state.cover.date=this.value;renderCanvas()">
+      <div class="field-label">수신 고객명</div>
+      <input class="field-input" placeholder="예: 홍길동" value="${esc(c.recipient)}" oninput="state.cover.recipient=this.value;renderCanvas()">
+      <div class="field-label">직함 / 소속</div>
+      <input class="field-input" placeholder="예: 구매팀장 / ○○주식회사" value="${esc(c.recipientTitle)}" oninput="state.cover.recipientTitle=this.value;renderCanvas()">
+    </div>
+    <div class="panel-section">
+      <div class="panel-heading">디자인</div>
+      <div class="field-label">배경 색상</div>
+      <div class="color-row">${['#1c1c2e','#0f2044','#1a3a2a','#2c1810','#2a2a2a','#3d3d5c'].map(col=>`
+        <div class="color-swatch${state.coverColor===col?' active':''}" style="background:${col}" onclick="state.coverColor='${col}';renderCanvas();renderPanel()"></div>`).join('')}</div>
+      <div class="color-pick-wrap">
+        <input type="color" value="${state.coverColor}" oninput="state.coverColor=this.value;renderCanvas()">
+        <span style="font-size:11px;color:var(--muted)">직접 선택</span>
+      </div>
+      <div class="field-label">포인트 색상</div>
+      <div class="color-row">${['#c0392b','#2980b9','#27ae60','#8e44ad','#e67e22','#16a085'].map(col=>`
+        <div class="color-swatch${state.accentColor===col?' active':''}" style="background:${col}" onclick="state.accentColor='${col}';renderCanvas();renderPanel()"></div>`).join('')}</div>
+      <div class="color-pick-wrap">
+        <input type="color" value="${state.accentColor}" oninput="state.accentColor=this.value;renderCanvas()">
+        <span style="font-size:11px;color:var(--muted)">직접 선택</span>
+      </div>
+      <div class="field-label">헤더·푸터 선 색상</div>
+      <div class="color-row">${['#e2e2da','#cccccc','#aaaaaa','#1c1c2e','#c0392b','#2980b9','#27ae60','#e67e22'].map(col=>`
+        <div class="color-swatch${(state.borderColor||'#e2e2da')===col?' active':''}" style="background:${col};border:1px solid #ccc;" onclick="state.borderColor='${col}';renderCanvas();renderPanel()"></div>`).join('')}</div>
+      <div class="color-pick-wrap">
+        <input type="color" value="${state.borderColor||'#e2e2da'}" oninput="state.borderColor=this.value;renderCanvas()">
+        <span style="font-size:11px;color:var(--muted)">직접 선택</span>
+      </div>
+    </div>
+    <div class="panel-section">
+      <div class="panel-heading">회사 로고</div>
+      <div class="logo-upload-area" onclick="document.getElementById('logoInput').click()">
+        ${state.logo?`<img class="logo-preview" src="${state.logo}">`:''} 
+        <div class="logo-hint">${state.logo?'클릭하여 변경':'클릭하여 로고 업로드<br><small>PNG · SVG · JPG</small>'}</div>
+      </div>
+      <input type="file" id="logoInput" style="display:none" accept="image/*" onchange="uploadLogo(this)">
+      ${state.logo ? `
+        <div class="field-label" style="margin-top:8px;">표지 로고 색상</div>
+        <div style="display:flex;gap:6px;margin-bottom:10px;">
+          <button class="img-layout-btn${!state.coverLogoColor||state.coverLogoColor==='white'?' active':''}"
+            onclick="state.coverLogoColor='white';renderCanvas();renderPanel()"
+            style="font-size:11px;padding:6px;">흰색</button>
+          <button class="img-layout-btn${state.coverLogoColor==='original'?' active':''}"
+            onclick="state.coverLogoColor='original';renderCanvas();renderPanel()"
+            style="font-size:11px;padding:6px;">원본 색상</button>
+        </div>
+        <button class="apply-btn" style="background:#888;margin-top:0" onclick="removeLogo()">로고 제거</button>` : ''}
+    </div>`;
+  return wrap;
+}
+
+function buildTocPanel() {
+  const wrap = document.createElement('div');
+  wrap.innerHTML = `<div class="panel-section">
+    <div class="panel-heading">목차 편집</div>
+    <div class="field-hint">항목명과 페이지 번호를 직접 입력하세요.</div>
+    ${state.toc.map((t,i)=>`
+      <div class="toc-item-row">
+        <input value="${esc(t.title)}" placeholder="항목명" oninput="state.toc[${i}].title=this.value;renderCanvas()">
+        <input class="toc-pg-input" value="${esc(t.page)}" placeholder="P" oninput="state.toc[${i}].page=this.value;renderCanvas()">
+        <button class="toc-del-btn" onclick="delToc(${i})">✕</button>
+      </div>`).join('')}
+    <button class="toc-add-btn" onclick="addToc()">+ 항목 추가</button>
+  </div>`;
+  return wrap;
+}
+
+function buildTextPanel(pg) {
+  const idx = currentPage;
+  const wrap = document.createElement('div');
+  wrap.innerHTML = `
+    <div class="panel-section">
+      <div class="panel-heading">텍스트 페이지 편집</div>
+      <div class="field-label">페이지 제목</div>
+      <input class="field-input" value="${esc(pg.title)}" oninput="state.pages[${idx}].title=this.value;renderCanvas();renderSidebar()">
+      <div class="field-label">본문</div>
+      <textarea class="field-textarea" rows="12" oninput="state.pages[${idx}].body=this.value;renderCanvas()">${esc(pg.body)}</textarea>
+      <div class="field-hint">캔버스에서 직접 클릭하여 편집할 수도 있습니다.</div>
+    </div>
+    <div class="panel-section">
+      <div class="panel-heading">페이지 관리</div>
+      <button class="apply-btn" style="background:#c0392b" onclick="deletePage(${idx},{stopPropagation:()=>{}})">이 페이지 삭제</button>
+    </div>`;
+  return wrap;
+}
+
+function buildImagePanel(pg) {
+  const idx = currentPage;
+  const layout = pg.imageLayout || '2';
+  const imgs = pg.images || [];
+  const captions = pg.captions || [];
+  const isSideLayout = layout === 'img-left' || layout === 'img-right';
+
+  const wrap = document.createElement('div');
+
+  // layout button definitions
+  const layouts = [
+    { key: '1',         label: '1장\n전체' },
+    { key: '2',         label: '2장\n나란히' },
+    { key: '3',         label: '3장\n격자' },
+    { key: 'img-left',  label: '🖼 왼쪽\n글 오른쪽' },
+    { key: 'img-right', label: '글 왼쪽\n🖼 오른쪽' },
+  ];
+
+  const layoutBtns = `
+    <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:5px;margin-bottom:10px;">
+      ${layouts.map(l => `
+        <button class="img-layout-btn${layout===l.key?' active':''}"
+          onclick="setImgLayout(${idx},'${l.key}')"
+          style="white-space:pre-line;font-size:10px;padding:6px 4px;line-height:1.4;">
+          ${l.label}
+        </button>`).join('')}
+    </div>`;
+
+  // image upload slots
+  let slotsHtml = '';
+  const slotCount = isSideLayout ? 1 : parseInt(layout);
+  for (let i = 0; i < slotCount; i++) {
+    const src = imgs[i];
+    slotsHtml += `<div class="img-slot-wrap">
+      <div class="field-label">${isSideLayout ? '이미지' : `이미지 ${i+1}`}</div>
+      <div class="img-slot" style="height:${src?'auto':'80px'}" onclick="triggerImgUpload(${idx},${i})">
+        ${src
+          ? `<img src="${src}" style="width:100%;max-height:120px;object-fit:cover;"><button class="img-slot-del" onclick="removeImg(event,${idx},${i})">✕</button>`
+          : `<div class="img-slot-empty"><div class="img-slot-icon">🖼</div><div class="img-slot-label">클릭하여 업로드</div></div>`}
+      </div>
+      <input class="img-caption-input" placeholder="이미지 설명 (선택)" value="${esc(captions[i]||'')}" oninput="state.pages[${idx}].captions[${i}]=this.value;renderCanvas()">
+    </div>`;
+  }
+
+  // side-layout text fields
+  const sideTextHtml = isSideLayout ? `
+    <div class="panel-section">
+      <div class="panel-heading">텍스트 영역</div>
+      <div class="field-label">소제목</div>
+      <input class="field-input" placeholder="소제목 (비워두면 숨김)" value="${esc(pg.sideTitle||'')}"
+        oninput="state.pages[${idx}].sideTitle=this.value;renderCanvas()">
+      <div class="field-label">본문 텍스트</div>
+      <textarea class="field-textarea" rows="10"
+        oninput="state.pages[${idx}].sideBody=this.value;renderCanvas()">${esc(pg.sideBody||'텍스트를 입력하세요.\n\n제품 설명, 특징, 사양 등을 자유롭게 작성하세요.')}</textarea>
+    </div>` : `
+    <div class="panel-section">
+      <div class="panel-heading">텍스트 영역</div>
+      <div class="field-label">이미지 위 텍스트 (선택)</div>
+      <textarea class="field-textarea" rows="3" placeholder="이미지 위에 표시할 설명 (없으면 비워두세요)"
+        oninput="state.pages[${idx}].body=this.value;renderCanvas()">${esc(pg.body||'')}</textarea>
+      <div class="field-label">이미지 아래 텍스트 (선택)</div>
+      <textarea class="field-textarea" rows="3" placeholder="이미지 아래에 표시할 설명 (없으면 비워두세요)"
+        oninput="state.pages[${idx}].bodyBottom=this.value;renderCanvas()">${esc(pg.bodyBottom||'')}</textarea>
+      <div class="field-hint">캔버스에서 직접 클릭하여 편집할 수도 있습니다.</div>
+    </div>`;
+
+  wrap.innerHTML = `
+    <div class="panel-section">
+      <div class="panel-heading">이미지 페이지 편집</div>
+      <div class="field-label">페이지 제목</div>
+      <input class="field-input" value="${esc(pg.title)}"
+        oninput="state.pages[${idx}].title=this.value;renderCanvas();renderSidebar()">
+    </div>
+    <div class="panel-section">
+      <div class="panel-heading">레이아웃 선택</div>
+      ${layoutBtns}
+      <div class="field-hint" style="margin-top:0;">
+        ${isSideLayout
+          ? `이미지와 텍스트가 좌우로 나란히 배치됩니다.`
+          : `이미지만 배치하는 레이아웃입니다.`}
+      </div>
+    </div>
+    <div class="panel-section">
+      <div class="panel-heading">이미지 업로드</div>
+      ${slotsHtml}
+      <input type="file" id="imgUploadInput" style="display:none" accept="image/*" onchange="onImgFileSelect(this)">
+    </div>
+    ${sideTextHtml}
+    <div class="panel-section">
+      <div class="panel-heading">페이지 관리</div>
+      <button class="apply-btn" style="background:#c0392b"
+        onclick="deletePage(${idx},{stopPropagation:()=>{}})">이 페이지 삭제</button>
+    </div>`;
+  return wrap;
+}
+
+function buildPdfPanel(pg) {
+  const idx = currentPage;
+  const wrap = document.createElement('div');
+  wrap.innerHTML = `
+    <div class="panel-section">
+      <div class="panel-heading">PDF 가져오기 페이지</div>
+      <div class="field-label">페이지 제목</div>
+      <input class="field-input" value="${esc(pg.title)}" oninput="state.pages[${idx}].title=this.value;renderCanvas();renderSidebar()">
+      <div class="field-hint">이 페이지는 PDF에서 가져온 이미지입니다.<br>헤더(로고)와 푸터(번호·날짜·고객명)는 자동으로 유지됩니다.</div>
+    </div>
+    <div class="panel-section">
+      <div class="panel-heading">페이지 관리</div>
+      <button class="apply-btn" style="background:#c0392b" onclick="deletePage(${idx},{stopPropagation:()=>{}})">이 페이지 삭제</button>
+    </div>`;
+  return wrap;
+}
+
+function buildContactPanel() {
+  const ct = state.contact;
+  const wrap = document.createElement('div');
+  wrap.innerHTML = `<div class="panel-section">
+    <div class="panel-heading">연락처 정보</div>
+    <div class="field-label">회사명</div>
+    <input class="field-input" value="${esc(ct.companyName)}" oninput="state.contact.companyName=this.value;renderCanvas()">
+    <div class="field-label">슬로건</div>
+    <input class="field-input" value="${esc(ct.tagline)}" oninput="state.contact.tagline=this.value;renderCanvas()">
+    <div class="field-label">전화</div>
+    <input class="field-input" value="${esc(ct.tel)}" oninput="state.contact.tel=this.value;renderCanvas()">
+    <div class="field-label">팩스</div>
+    <input class="field-input" value="${esc(ct.fax)}" oninput="state.contact.fax=this.value;renderCanvas()">
+    <div class="field-label">이메일</div>
+    <input class="field-input" value="${esc(ct.email)}" oninput="state.contact.email=this.value;renderCanvas()">
+    <div class="field-label">웹사이트</div>
+    <input class="field-input" value="${esc(ct.web)}" oninput="state.contact.web=this.value;renderCanvas()">
+    <div class="field-label">주소</div>
+    <input class="field-input" value="${esc(ct.address)}" oninput="state.contact.address=this.value;renderCanvas()">
+    <div class="field-label">담당자</div>
+    <input class="field-input" value="${esc(ct.person)}" oninput="state.contact.person=this.value;renderCanvas()">
+  </div>`;
+  return wrap;
+}
+
+// ────────────────────────────────────────
+// PAGE MANAGEMENT
+// ────────────────────────────────────────
+function addContentPage() {
+  state.pages.push({ id: uid(), type: 'text', title: '새 페이지', body: '내용을 입력하세요.' });
+  currentPage = state.pages.length - 1;
+  render();
+}
+
+function addImagePage() {
+  state.pages.push({ id: uid(), type: 'image', title: '이미지 페이지', body: '', images: [null, null], imageLayout: '2', captions: ['',''] });
+  currentPage = state.pages.length - 1;
+  render();
+}
+
+function deletePage(key, e) {
+  e.stopPropagation();
+  if (!confirm('이 페이지를 삭제할까요?')) return;
+  const idx = parseInt(key);
+  state.pages.splice(idx, 1);
+  currentPage = state.pages.length > 0 ? Math.min(idx, state.pages.length-1) : 'cover';
+  render();
+}
+
+function addToc() { state.toc.push({title:'새 항목',page:''}); renderPanel(); renderCanvas(); }
+function delToc(i) { state.toc.splice(i,1); renderPanel(); renderCanvas(); }
+
+// ────────────────────────────────────────
+// IMAGE UPLOAD (for image pages)
+// ────────────────────────────────────────
+let _imgUploadTarget = null; // {pageIdx, slotIdx}
+
+function triggerImgUpload(pageIdx, slotIdx) {
+  _imgUploadTarget = { pageIdx, slotIdx };
+  document.getElementById('imgUploadInput').click();
+}
+
+function onImgFileSelect(input) {
+  const file = input.files[0];
+  if (!file || !_imgUploadTarget) return;
+  const reader = new FileReader();
+  reader.onload = e => {
+    const { pageIdx, slotIdx } = _imgUploadTarget;
+    const pg = state.pages[pageIdx];
+    if (!pg) return;
+    if (!pg.images) pg.images = [];
+    pg.images[slotIdx] = e.target.result;
+    renderCanvas();
+    renderPanel();
+    input.value = '';
+  };
+  reader.readAsDataURL(file);
+}
+
+function removeImg(event, pageIdx, slotIdx) {
+  event.stopPropagation();
+  const pg = state.pages[pageIdx];
+  if (pg && pg.images) { pg.images[slotIdx] = null; renderCanvas(); renderPanel(); }
+}
+
+function setImgLayout(pageIdx, layout) {
+  const pg = state.pages[pageIdx];
+  if (!pg) return;
+  pg.imageLayout = layout;
+  const isSide = layout === 'img-left' || layout === 'img-right';
+  const n = isSide ? 1 : parseInt(layout);
+  if (!pg.images) pg.images = [];
+  if (!pg.captions) pg.captions = [];
+  while (pg.images.length < n) pg.images.push(null);
+  while (pg.captions.length < n) pg.captions.push('');
+  // init side text fields if needed
+  if (isSide && pg.sideTitle === undefined) pg.sideTitle = '';
+  if (isSide && !pg.sideBody) pg.sideBody = '텍스트를 입력하세요.\n\n제품 설명, 특징, 사양 등을 자유롭게 작성하세요.';
+  renderCanvas();
+  renderPanel();
+}
+
+// ────────────────────────────────────────
+// LOGO
+// ────────────────────────────────────────
+function uploadLogo(input) {
+  const file = input.files[0];
+  if (!file) return;
+  const reader = new FileReader();
+  reader.onload = e => { state.logo = e.target.result; renderPanel(); renderCanvas(); };
+  reader.readAsDataURL(file);
+}
+function removeLogo() { state.logo = null; renderPanel(); renderCanvas(); }
+
+// ────────────────────────────────────────
+// PDF IMPORT
+// ────────────────────────────────────────
+function openPdfImportModal() {
+  pdfImportPages = [];
+  document.getElementById('pdfDropZone').style.display = '';
+  document.getElementById('pdfImportLoading').style.display = 'none';
+  document.getElementById('pdfPageSelector').style.display = 'none';
+  document.getElementById('pdfImportBtn').style.display = 'none';
+  document.getElementById('pdfFileInput').value = '';
+  document.getElementById('pdfImportModal').classList.add('open');
+}
+function closePdfImportModal() {
+  document.getElementById('pdfImportModal').classList.remove('open');
+  pdfImportPages = [];
+}
+
+function onPdfDragOver(e) { e.preventDefault(); document.getElementById('pdfDropZone').classList.add('drag-over'); }
+function onPdfDragLeave(e) { document.getElementById('pdfDropZone').classList.remove('drag-over'); }
+function onPdfDrop(e) {
+  e.preventDefault();
+  document.getElementById('pdfDropZone').classList.remove('drag-over');
+  const file = e.dataTransfer.files[0];
+  if (file && file.type === 'application/pdf') processPdfFile(file);
+}
+function onPdfFileSelect(input) {
+  const file = input.files[0];
+  if (file) processPdfFile(file);
+}
+
+async function processPdfFile(file) {
+  document.getElementById('pdfDropZone').style.display = 'none';
+  document.getElementById('pdfImportLoading').style.display = 'block';
+  document.getElementById('pdfLoadingText').textContent = 'PDF 불러오는 중...';
+
+  try {
+    const arrayBuffer = await file.arrayBuffer();
+    const pdf = await pdfjsLib.getDocument({ data: arrayBuffer }).promise;
+    const totalPages = pdf.numPages;
+    pdfImportPages = [];
+
+    for (let i = 1; i <= totalPages; i++) {
+      document.getElementById('pdfLoadingText').textContent = `페이지 변환 중... (${i}/${totalPages})`;
+      const page = await pdf.getPage(i);
+      const viewport = page.getViewport({ scale: 1.5 });
+      const canvas = document.createElement('canvas');
+      canvas.width = viewport.width;
+      canvas.height = viewport.height;
+      const ctx = canvas.getContext('2d');
+      await page.render({ canvasContext: ctx, viewport }).promise;
+      pdfImportPages.push({ dataUrl: canvas.toDataURL('image/jpeg', 0.9), selected: true });
+    }
+
+    document.getElementById('pdfImportLoading').style.display = 'none';
+    renderPdfPageGrid();
+    document.getElementById('pdfPageSelector').style.display = 'block';
+    document.getElementById('pdfImportBtn').style.display = 'block';
+    updatePdfSelectedCount();
+  } catch(err) {
+    document.getElementById('pdfImportLoading').style.display = 'none';
+    document.getElementById('pdfDropZone').style.display = '';
+    alert('PDF 불러오기 실패: ' + err.message);
+  }
+}
+
+function renderPdfPageGrid() {
+  const grid = document.getElementById('pdfPageGrid');
+  grid.innerHTML = pdfImportPages.map((p, i) => `
+    <div class="pdf-pg-thumb${p.selected?' selected':''}" onclick="togglePdfPage(${i})">
+      <img src="${p.dataUrl}" alt="p${i+1}">
+      <div class="pdf-pg-check">✓</div>
+      <div class="pdf-pg-num">${i+1}</div>
+    </div>`).join('');
+}
+
+function togglePdfPage(i) {
+  pdfImportPages[i].selected = !pdfImportPages[i].selected;
+  renderPdfPageGrid();
+  updatePdfSelectedCount();
+}
+
+function selectAllPdfPages(val) {
+  pdfImportPages.forEach(p => p.selected = val);
+  renderPdfPageGrid();
+  updatePdfSelectedCount();
+}
+
+function updatePdfSelectedCount() {
+  const n = pdfImportPages.filter(p=>p.selected).length;
+  document.getElementById('pdfSelectedCount').textContent = `${n}개 선택됨`;
+}
+
+function doImportPdf() {
+  const selected = pdfImportPages.filter(p=>p.selected);
+  if (!selected.length) { alert('가져올 페이지를 선택하세요.'); return; }
+  selected.forEach((p, i) => {
+    state.pages.push({
+      id: uid(),
+      type: 'pdf',
+      title: `PDF 페이지 ${i+1}`,
+      pdfImage: p.dataUrl
+    });
+  });
+  currentPage = state.pages.length - 1;
+  closePdfImportModal();
+  render();
+  showToast(`${selected.length}페이지를 카탈로그에 추가했습니다 ✓`);
+}
+
+// ────────────────────────────────────────
+// SAVE / LOAD (파일 기반)
+// ────────────────────────────────────────
+function openSaveModal() {
+  document.getElementById('saveNameInput').value = state.projectName;
+  document.getElementById('saveModal').classList.add('open');
+  setTimeout(()=>document.getElementById('saveNameInput').focus(), 80);
+}
+function closeSaveModal() { document.getElementById('saveModal').classList.remove('open'); }
+
+function doSave() {
+  const name = document.getElementById('saveNameInput').value.trim() || '저장본';
+  state.projectName = name;
+  const json = JSON.stringify(state, null, 2);
+  const blob = new Blob([json], { type: 'application/json' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = `${name}.catalog.json`;
+  a.click();
+  URL.revokeObjectURL(url);
+  closeSaveModal();
+  render();
+  showToast(`"${name}.catalog.json" 저장 완료 ✓`);
+}
+
+function openLoadModal() {
+  document.getElementById('loadModal').classList.add('open');
+}
+function closeLoadModal() { document.getElementById('loadModal').classList.remove('open'); }
+
+function triggerLoadFile() {
+  document.getElementById('loadFileInput').click();
+}
+
+function onLoadFileDrop(e) {
+  e.preventDefault();
+  const file = e.dataTransfer.files[0];
+  if (!file) return;
+  const fakeInput = { files: [file], value: '' };
+  onLoadFileSelect(fakeInput);
+}
+
+function onLoadFileSelect(input) {
+  const file = input.files[0];
+  if (!file) return;
+  const reader = new FileReader();
+  reader.onload = e => {
+    try {
+      const loaded = JSON.parse(e.target.result);
+      state = loaded;
+      currentPage = 'cover';
+      closeLoadModal();
+      render();
+      showToast(`"${file.name}" 불러오기 완료 ✓`);
+    } catch {
+      alert('파일을 읽을 수 없습니다.\n올바른 .catalog.json 파일인지 확인해주세요.');
+    }
+    input.value = '';
+  };
+  reader.readAsText(file);
+}
+
+// ────────────────────────────────────────
+// PDF EXPORT
+// ────────────────────────────────────────
+async function exportPDF() {
+  showToast('PDF 생성 중... 잠시 기다려주세요');
+  const wrap = document.createElement('div');
+  wrap.style.cssText = 'position:fixed;left:-9999px;top:0;width:794px;font-family:\'Noto Sans KR\',sans-serif;';
+  document.body.appendChild(wrap);
+
+  const st = document.createElement('style');
+  st.textContent = document.querySelector('style').textContent;
+  wrap.appendChild(st);
+
+  const allPageEls = [
+    buildCover(),
+    buildToc(),
+    ...state.pages.map((pg,i) => {
+      if (pg.type === 'pdf') return buildPdfPage(pg, i);
+      if (pg.type === 'image') return buildImagePage(pg, i);
+      return buildTextPage(pg, i);
+    }),
+    buildContact()
+  ];
+
+  allPageEls.forEach(el => {
+    el.style.cssText = 'page-break-after:always;width:794px;min-height:1123px;position:relative;overflow:hidden;background:white;';
+    wrap.appendChild(el);
+  });
+
+  const opt = {
+    margin: 0,
+    filename: `${state.projectName||'catalog'}.pdf`,
+    image: { type: 'jpeg', quality: 0.92 },
+    html2canvas: { scale: 2, useCORS: true, logging: false, width: 794, windowWidth: 794 },
+    jsPDF: { unit: 'px', format: [794, 1123], orientation: 'portrait', hotfixes: ['px_scaling'] },
+    pagebreak: { mode: 'css' }
+  };
+
+  try {
+    await html2pdf().set(opt).from(wrap).save();
+    showToast('PDF 다운로드 완료! ✓');
+  } catch(e) {
+    alert('PDF 생성 오류: ' + e.message);
+  } finally {
+    document.body.removeChild(wrap);
+  }
+}
+
+// ────────────────────────────────────────
+// UTILS
+// ────────────────────────────────────────
+function showToast(msg) {
+  const t = document.getElementById('toast');
+  t.textContent = msg; t.classList.add('show');
+  clearTimeout(t._tid);
+  t._tid = setTimeout(()=>t.classList.remove('show'), 2800);
+}
+
+function esc(str) {
+  if (str==null) return '';
+  return String(str).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+}
+
+['saveModal','loadModal','pdfImportModal'].forEach(id=>{
+  document.getElementById(id).addEventListener('click', e=>{
+    if(e.target===e.currentTarget) document.getElementById(id).classList.remove('open');
+  });
+});
+
+document.addEventListener('keydown', e=>{
+  if((e.ctrlKey||e.metaKey)&&e.key==='s'){e.preventDefault();openSaveModal();}
+});
+
+init();
+</script>
+</body>
+</html>
