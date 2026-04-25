@@ -1272,7 +1272,7 @@ function onLoadFileSelect(input) {
 async function exportPDF() {
   showToast('PDF 생성 중... 잠시 기다려주세요');
   const wrap = document.createElement('div');
-  wrap.style.cssText = 'position:fixed;left:-9999px;top:0;width:794px;font-family:\'Noto Sans KR\',sans-serif;';
+  wrap.style.cssText = 'position:absolute;top:0;left:0;width:794px;font-family:\'Noto Sans KR\',sans-serif;z-index:-9999;pointer-events:none;';
   document.body.appendChild(wrap);
 
   const st = document.createElement('style');
@@ -1295,11 +1295,19 @@ async function exportPDF() {
     wrap.appendChild(el);
   });
 
+  // 이미지가 모두 로드될 때까지 대기
+  await Promise.all(
+    Array.from(wrap.querySelectorAll('img')).map(img =>
+      img.complete ? Promise.resolve() :
+      new Promise(r => { img.onload = r; img.onerror = r; })
+    )
+  );
+
   const opt = {
     margin: 0,
     filename: `${state.projectName||'catalog'}.pdf`,
     image: { type: 'jpeg', quality: 0.92 },
-    html2canvas: { scale: 2, useCORS: true, logging: false, width: 794, windowWidth: 794 },
+    html2canvas: { scale: 2, useCORS: true, allowTaint: true, logging: false, width: 794, windowWidth: 794, scrollX: 0, scrollY: 0 },
     jsPDF: { unit: 'px', format: [794, 1123], orientation: 'portrait', hotfixes: ['px_scaling'] },
     pagebreak: { mode: 'css' }
   };
