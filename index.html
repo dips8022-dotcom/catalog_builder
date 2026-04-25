@@ -76,10 +76,16 @@ body { font-family: Arial, 'Noto Sans KR', sans-serif; background: #e0e0dc; colo
 .mini-contact-line { height: 2px; width: 70%; background: #e0e0d8; border-radius: 1px; }
 .mini-pdf-img { width: 100%; height: 100%; object-fit: cover; }
 
-.page-tag { position: absolute; bottom: 0; left: 0; right: 0; background: rgba(0,0,0,.7); color: white; font-size: 8px; padding: 3px 5px; display: flex; justify-content: space-between; align-items: center; }
+.page-tag { position: absolute; bottom: 0; left: 0; right: 0; background: rgba(0,0,0,.7); color: white; font-size: 8px; padding: 3px 5px; display: flex; justify-content: space-between; align-items: center; gap: 3px; }
 .page-tag span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .page-del { color: rgba(255,100,100,.7); cursor: pointer; flex-shrink: 0; }
 .page-del:hover { color: #e74c3c; }
+.page-drag-handle { color: rgba(255,255,255,.35); cursor: grab; flex-shrink: 0; font-size: 10px; line-height: 1; padding: 0 1px; }
+.page-drag-handle:hover { color: rgba(255,255,255,.7); }
+.page-item[draggable="true"] { cursor: default; }
+.page-item.dragging { opacity: 0.35; }
+.page-item.drag-over-top { border-top: 2px solid var(--accent); }
+.page-item.drag-over-bottom { border-bottom: 2px solid var(--accent); }
 .add-page-btn { width: 100%; padding: 7px; border: 1.5px dashed rgba(255,255,255,.15); background: none; color: rgba(255,255,255,.35); border-radius: 2px; font-size: 10px; cursor: pointer; font-family: inherit; transition: all .15s; letter-spacing: 1px; margin-top: 2px; }
 .add-page-btn:hover { border-color: rgba(255,255,255,.45); color: rgba(255,255,255,.65); }
 
@@ -468,12 +474,22 @@ function renderSidebar() {
     div.innerHTML = `
       <div class="page-thumb-wrap"><div class="mini">${p.miniHtml}</div></div>
       <div class="page-tag">
-        <span>${esc(p.label)}</span>
+        ${p.deletable ? `<span class="page-drag-handle" title="드래그하여 이동">⠿</span>` : '<span></span>'}
+        <span style="flex:1;">${esc(p.label)}</span>
         ${p.deletable ? `<span class="page-del" onclick="deletePage('${p.key}',event)">✕</span>` : ''}
       </div>`;
     if (p.pdfThumb) {
       const img = div.querySelector('.mini-pdf-img');
       if (img) img.src = p.pdfThumb;
+    }
+    if (p.deletable) {
+      div.draggable = true;
+      div.dataset.pageIdx = p.key;
+      div.addEventListener('dragstart', onPageDragStart);
+      div.addEventListener('dragover',  onPageDragOver);
+      div.addEventListener('dragleave', onPageDragLeave);
+      div.addEventListener('drop',      onPageDrop);
+      div.addEventListener('dragend',   onPageDragEnd);
     }
     frag.appendChild(div);
   });
@@ -606,7 +622,8 @@ function buildImagePage(pg, idx) {
   let imgHtml = '';
 
   const _imgH_side = pg.imageHeight !== undefined ? pg.imageHeight : 320;
-  const _imgH_grid = pg.imageHeight !== undefined ? pg.imageHeight : (layout === '1' ? 280 : layout === '3' ? 160 : 200);
+  const _imgH_grid = pg.imageHeight !== undefined ? pg.imageHeight :
+    (layout === '1' ? 280 : layout === '3' || layout === '3b' ? 150 : layout === '2b' ? 170 : 200);
   const _imgFit = pg.imageFit || 'cover';
 
   if (layout === 'img-left' || layout === 'img-right') {
@@ -643,6 +660,38 @@ function buildImagePage(pg, idx) {
       </div>
       ${footerHtml(idx+3)}`;
 
+  } else if (layout === '2b' || layout === '3b') {
+    // ── 상단 N장 + 하단 1장 ──
+    const topCount = layout === '2b' ? 2 : 3;
+    const makeImgItem = (src, cap, h) => {
+      let html = '<div class="pg-img-item">';
+      if (src) {
+        html += `<img src="${src}" alt="" style="height:${h}px;object-fit:${_imgFit};">`;
+      } else {
+        html += `<div style="width:100%;height:${h}px;background:#f0efe9;border-radius:2px;display:flex;align-items:center;justify-content:center;flex-direction:column;gap:8px;border:1.5px dashed #ddd;"><span style="font-size:28px;opacity:.25;">🖼</span><span style="font-size:11px;color:#bbb;">이미지를 업로드하세요</span></div>`;
+      }
+      if (cap) html += `<div class="pg-img-caption">${esc(cap)}</div>`;
+      return html + '</div>';
+    };
+    let topRow = `<div style="display:flex;gap:14px;">`;
+    for (let i = 0; i < topCount; i++) {
+      topRow += makeImgItem(imgs[i], captions[i] || '', _imgH_grid);
+    }
+    topRow += '</div>';
+    const botH = Math.round(_imgH_grid * 1.3);
+    const botItem = makeImgItem(imgs[topCount], captions[topCount] || '', botH);
+    const gridHtml = `<div style="display:flex;flex-direction:column;gap:14px;">${topRow}${botItem}</div>`;
+
+    div.innerHTML = `
+      ${headerHtml(pg.title)}
+      <div class="page-body">
+        <div class="page-sec-title" contenteditable="true" spellcheck="false" onblur="onTitleBlur('${pg.id}',this)">${esc(pg.title)}</div>
+        <div class="page-sec-divider" style="background:${state.accentColor}"></div>
+        ${pg.body ? `<div class="page-content-area" style="margin-bottom:16px;" contenteditable="true" spellcheck="false" onblur="onBodyBlur('${pg.id}',this)">${esc(pg.body)}</div>` : ''}
+        ${gridHtml}
+        ${pg.bodyBottom ? `<div class="page-content-area" style="margin-top:16px;" contenteditable="true" spellcheck="false" onblur="onBodyBottomBlur('${pg.id}',this)">${esc(pg.bodyBottom)}</div>` : ''}
+      </div>
+      ${footerHtml(idx+3)}`;
   } else {
     // ── Grid layouts: 1 / 2 / 3 images ──
     let gridHtml = `<div class="pg-images layout-${layout}">`;
@@ -662,7 +711,6 @@ function buildImagePage(pg, idx) {
       gridHtml += `</div>`;
     }
     gridHtml += '</div>';
-
     div.innerHTML = `
       ${headerHtml(pg.title)}
       <div class="page-body">
@@ -899,6 +947,8 @@ function buildImagePanel(pg) {
     { key: '1',         label: '1장\n전체' },
     { key: '2',         label: '2장\n나란히' },
     { key: '3',         label: '3장\n격자' },
+    { key: '2b',        label: '2장+\n하단 1장' },
+    { key: '3b',        label: '3장+\n하단 1장' },
     { key: 'img-left',  label: '🖼 왼쪽\n글 오른쪽' },
     { key: 'img-right', label: '글 왼쪽\n🖼 오른쪽' },
   ];
@@ -915,7 +965,7 @@ function buildImagePanel(pg) {
 
   // image upload slots
   let slotsHtml = '';
-  const slotCount = isSideLayout ? 1 : parseInt(layout);
+  const slotCount = layoutSlotCount(layout);
   for (let i = 0; i < slotCount; i++) {
     const src = imgs[i];
     slotsHtml += `<div class="img-slot-wrap">
@@ -930,7 +980,7 @@ function buildImagePanel(pg) {
   }
 
   // image height & fit controls
-  const defaultH = isSideLayout ? 320 : layout === '1' ? 280 : layout === '3' ? 160 : 200;
+  const defaultH = isSideLayout ? 320 : layout === '1' ? 280 : layout === '3' || layout === '3b' ? 150 : layout === '2b' ? 170 : 200;
   const curH = pg.imageHeight !== undefined ? pg.imageHeight : defaultH;
   const curFit = pg.imageFit || 'cover';
   slotsHtml += `
@@ -1098,12 +1148,82 @@ function removeImg(event, pageIdx, slotIdx) {
   if (pg && pg.images) { pg.images[slotIdx] = null; renderCanvas(); renderPanel(); }
 }
 
+// ────────────────────────────────────────
+// PAGE DRAG & DROP (sidebar reorder)
+// ────────────────────────────────────────
+let _dragSrcIdx = null;
+
+function onPageDragStart(e) {
+  _dragSrcIdx = +this.dataset.pageIdx;
+  e.dataTransfer.effectAllowed = 'move';
+  e.dataTransfer.setData('text/plain', _dragSrcIdx);
+  setTimeout(() => this.classList.add('dragging'), 0);
+}
+
+function onPageDragOver(e) {
+  e.preventDefault();
+  if (_dragSrcIdx === null) return;
+  const destIdx = +this.dataset.pageIdx;
+  if (destIdx === _dragSrcIdx) return;
+  const rect = this.getBoundingClientRect();
+  const mid = rect.top + rect.height / 2;
+  this.classList.remove('drag-over-top', 'drag-over-bottom');
+  this.classList.add(e.clientY < mid ? 'drag-over-top' : 'drag-over-bottom');
+}
+
+function onPageDragLeave() {
+  this.classList.remove('drag-over-top', 'drag-over-bottom');
+}
+
+function onPageDrop(e) {
+  e.preventDefault();
+  this.classList.remove('drag-over-top', 'drag-over-bottom');
+  if (_dragSrcIdx === null) return;
+  const destIdx = +this.dataset.pageIdx;
+  if (destIdx === _dragSrcIdx) { _dragSrcIdx = null; return; }
+
+  // 현재 페이지 id 기억 (재정렬 후 복원)
+  const currentId = typeof currentPage === 'number'
+    ? state.pages[currentPage]?.id : null;
+
+  // 드래그 위치(위쪽/아래쪽) 판별
+  const rect = this.getBoundingClientRect();
+  const insertAfter = e.clientY >= rect.top + rect.height / 2;
+
+  const item = state.pages.splice(_dragSrcIdx, 1)[0];
+  let adjustedDest = _dragSrcIdx < destIdx ? destIdx - 1 : destIdx;
+  if (insertAfter) adjustedDest++;
+  adjustedDest = Math.max(0, Math.min(adjustedDest, state.pages.length));
+  state.pages.splice(adjustedDest, 0, item);
+
+  // currentPage 복원
+  if (currentId) {
+    const newIdx = state.pages.findIndex(p => p.id === currentId);
+    currentPage = newIdx >= 0 ? newIdx : 0;
+  }
+  _dragSrcIdx = null;
+  render();
+}
+
+function onPageDragEnd() {
+  _dragSrcIdx = null;
+  document.querySelectorAll('.page-item').forEach(el =>
+    el.classList.remove('dragging', 'drag-over-top', 'drag-over-bottom'));
+}
+
+function layoutSlotCount(layout) {
+  if (layout === 'img-left' || layout === 'img-right') return 1;
+  if (layout === '2b') return 3;
+  if (layout === '3b') return 4;
+  return parseInt(layout);
+}
+
 function setImgLayout(pageIdx, layout) {
   const pg = state.pages[pageIdx];
   if (!pg) return;
   pg.imageLayout = layout;
   const isSide = layout === 'img-left' || layout === 'img-right';
-  const n = isSide ? 1 : parseInt(layout);
+  const n = layoutSlotCount(layout);
   if (!pg.images) pg.images = [];
   if (!pg.captions) pg.captions = [];
   while (pg.images.length < n) pg.images.push(null);
