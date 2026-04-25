@@ -104,6 +104,10 @@ body { font-family: Arial, 'Noto Sans KR', sans-serif; background: #e0e0dc; colo
 .field-textarea:focus { border-color: var(--primary); }
 .field-hint { font-size: 10px; color: var(--muted); margin-bottom: 10px; line-height: 1.5; }
 .field-select { width: 100%; padding: 8px 10px; border: 1.5px solid var(--border); border-radius: 2px; font-size: 13px; font-family: inherit; outline: none; background: white; margin-bottom: 10px; cursor: pointer; }
+.color-input { width: 34px; height: 30px; border: 1.5px solid var(--border); border-radius: 2px; cursor: pointer; padding: 2px; background: white; flex-shrink: 0; }
+.style-row { display: flex; align-items: center; gap: 7px; margin-bottom: 10px; }
+.style-row input[type=range] { flex: 1; accent-color: var(--primary); }
+.style-sz { font-size: 11px; color: #888; min-width: 34px; text-align: right; }
 
 .color-row { display: flex; gap: 6px; flex-wrap: wrap; margin-bottom: 10px; }
 .color-swatch { width: 24px; height: 24px; border-radius: 50%; cursor: pointer; border: 2px solid transparent; transition: all .12s; }
@@ -609,6 +613,7 @@ function buildTextPage(pg, idx) {
       <div class="page-content-area" contenteditable="true" spellcheck="false" onblur="onBodyBlur('${pg.id}',this)">${esc(pg.body)}</div>
     </div>
     ${footerHtml(idx+3)}`;
+  applyTextStyles(div, pg);
   return div;
 }
 
@@ -755,6 +760,7 @@ function buildImagePage(pg, idx) {
       ${footerHtml(idx+3)}`;
   }
 
+  applyTextStyles(div, pg);
   return div;
 }
 
@@ -955,9 +961,10 @@ function buildTextPanel(pg) {
       <div class="field-label">페이지 제목</div>
       <input class="field-input" value="${esc(pg.title)}" oninput="state.pages[${idx}].title=this.value;renderCanvas();renderSidebar()">
       <div class="field-label">본문</div>
-      <textarea class="field-textarea" rows="12" oninput="state.pages[${idx}].body=this.value;renderCanvas()">${esc(pg.body)}</textarea>
+      <textarea class="field-textarea" rows="8" oninput="state.pages[${idx}].body=this.value;renderCanvas()">${esc(pg.body)}</textarea>
       <div class="field-hint">캔버스에서 직접 클릭하여 편집할 수도 있습니다.</div>
     </div>
+    ${styleSection(pg, idx)}
     <div class="panel-section">
       <div class="panel-heading">페이지 관리</div>
       <button class="apply-btn" style="background:#c0392b" onclick="deletePage(${idx},{stopPropagation:()=>{}})">이 페이지 삭제</button>
@@ -1076,6 +1083,7 @@ function buildImagePanel(pg) {
       <input type="file" id="imgUploadInput" style="display:none" accept="image/*" onchange="onImgFileSelect(this)">
     </div>
     ${sideTextHtml}
+    ${styleSection(pg, idx)}
     <div class="panel-section">
       <div class="panel-heading">페이지 관리</div>
       <button class="apply-btn" style="background:#c0392b"
@@ -1307,6 +1315,61 @@ function setImgFit(pageIdx, fit) {
   pg.imageFit = fit;
   renderCanvas();
   renderPanel();
+}
+
+// ────────────────────────────────────────
+// TEXT STYLE (font size & color)
+// ────────────────────────────────────────
+function applyTextStyles(div, pg) {
+  const titleSize = (pg.titleFontSize || 26) + 'px';
+  const titleClr  = pg.titleColor  || '#1c1c2e';
+  const bodySize  = (pg.bodyFontSize  || 14) + 'px';
+  const bodyClr   = pg.bodyColor   || '#444444';
+
+  const secTitle = div.querySelector('.page-sec-title');
+  if (secTitle) { secTitle.style.fontSize = titleSize; secTitle.style.color = titleClr; }
+
+  const sideTitle = div.querySelector('.pg-side-title');
+  if (sideTitle) { sideTitle.style.fontSize = titleSize; sideTitle.style.color = titleClr; }
+
+  div.querySelectorAll('.page-content-area, .pg-side-body').forEach(el => {
+    el.style.fontSize = bodySize;
+    el.style.color    = bodyClr;
+  });
+}
+
+function styleSection(pg, idx) {
+  const titleSize = pg.titleFontSize || 26;
+  const titleClr  = pg.titleColor    || '#1c1c2e';
+  const bodySize  = pg.bodyFontSize  || 14;
+  const bodyClr   = pg.bodyColor     || '#444444';
+  return `
+  <div class="panel-section">
+    <div class="panel-heading">텍스트 스타일</div>
+    <div class="field-label">제목 크기 / 색상</div>
+    <div class="style-row">
+      <input type="range" min="12" max="72" step="1" value="${titleSize}"
+        oninput="setPageStyle(${idx},'titleFontSize',+this.value);this.nextElementSibling.textContent=this.value+'px'">
+      <span class="style-sz">${titleSize}px</span>
+      <input type="color" class="color-input" value="${titleClr}"
+        oninput="setPageStyle(${idx},'titleColor',this.value)">
+    </div>
+    <div class="field-label">본문 크기 / 색상</div>
+    <div class="style-row">
+      <input type="range" min="8" max="36" step="1" value="${bodySize}"
+        oninput="setPageStyle(${idx},'bodyFontSize',+this.value);this.nextElementSibling.textContent=this.value+'px'">
+      <span class="style-sz">${bodySize}px</span>
+      <input type="color" class="color-input" value="${bodyClr}"
+        oninput="setPageStyle(${idx},'bodyColor',this.value)">
+    </div>
+  </div>`;
+}
+
+function setPageStyle(pageIdx, prop, value) {
+  const pg = state.pages[pageIdx];
+  if (!pg) return;
+  pg[prop] = value;
+  renderCanvas();
 }
 
 // ────────────────────────────────────────
