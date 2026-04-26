@@ -1698,7 +1698,7 @@ async function prepareImagesForExport(el) {
       const c = document.createElement('canvas');
       c.width = W; c.height = H;
       const ctx = c.getContext('2d');
-      ctx.fillStyle = '#f8f8f6';
+      ctx.fillStyle = '#ffffff';
       ctx.fillRect(0, 0, W, H);
 
       if (fit === 'cover') {
@@ -1770,6 +1770,7 @@ async function exportPDF() {
 
       const canvas = await html2canvas(el, {
         scale: 2, useCORS: true, allowTaint: true, logging: false,
+        backgroundColor: '#ffffff',
         width: 794, height: 1123,
         windowWidth: 794, windowHeight: 1123,
         scrollX: 0, scrollY: 0,
