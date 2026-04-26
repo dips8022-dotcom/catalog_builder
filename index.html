@@ -291,6 +291,17 @@ body { font-family: Arial, 'Noto Sans KR', sans-serif; background: #e0e0dc; colo
 .toast { position: fixed; bottom: 24px; left: 50%; transform: translateX(-50%) translateY(16px); background: var(--primary); color: white; padding: 10px 22px; border-radius: 2px; font-size: 12px; opacity: 0; transition: all .3s; z-index: 9999; pointer-events: none; }
 .toast.show { opacity: 1; transform: translateX(-50%) translateY(0); }
 
+/* ── FORMAT BAR (텍스트 선택 시 플로팅 서식 툴바) ── */
+#formatBar { position:fixed; display:none; align-items:center; gap:2px; background:#24243c; border:1px solid rgba(255,255,255,.18); border-radius:5px; padding:4px 7px; box-shadow:0 4px 20px rgba(0,0,0,.5); z-index:8000; user-select:none; }
+.fmt-btn { width:27px; height:27px; background:none; border:1px solid transparent; border-radius:3px; color:rgba(255,255,255,.85); cursor:pointer; font-size:13px; display:inline-flex; align-items:center; justify-content:center; transition:all .1s; padding:0; font-family:inherit; flex-shrink:0; }
+.fmt-btn:hover { background:rgba(255,255,255,.14); border-color:rgba(255,255,255,.2); }
+.fmt-btn.on { background:rgba(255,255,255,.22); border-color:rgba(255,255,255,.25); }
+.fmt-sep-v { width:1px; height:17px; background:rgba(255,255,255,.15); margin:0 3px; flex-shrink:0; }
+.fmt-size-input { width:44px; height:27px; background:rgba(255,255,255,.08); border:1px solid rgba(255,255,255,.18); border-radius:3px; color:rgba(255,255,255,.9); font-size:12px; font-family:inherit; text-align:center; padding:0 4px; }
+.fmt-size-input:focus { outline:none; border-color:rgba(100,149,237,.7); }
+.fmt-color-input { width:27px; height:27px; border:1px solid rgba(255,255,255,.2); border-radius:3px; cursor:pointer; padding:2px; background:none; flex-shrink:0; }
+#formatBar .fmt-label { font-size:10px; color:rgba(255,255,255,.35); letter-spacing:.5px; padding:0 2px; }
+
 /* ── E-BOOK VIEWER ── */
 .viewer-overlay { position: fixed; inset: 0; z-index: 10000; background: #0d0d1a; display: none; flex-direction: column; }
 .viewer-overlay.open { display: flex; }
@@ -435,6 +446,19 @@ body { font-family: Arial, 'Noto Sans KR', sans-serif; background: #e0e0dc; colo
 </div>
 
 <div class="toast" id="toast"></div>
+
+<!-- FORMAT BAR -->
+<div id="formatBar">
+  <button class="fmt-btn" data-cmd="bold" title="굵게" onmousedown="event.preventDefault()" onclick="execFmt('bold')"><b>B</b></button>
+  <button class="fmt-btn" data-cmd="italic" title="기울임" onmousedown="event.preventDefault()" onclick="execFmt('italic')"><i>I</i></button>
+  <button class="fmt-btn" data-cmd="underline" title="밑줄" onmousedown="event.preventDefault()" onclick="execFmt('underline')"><u>U</u></button>
+  <div class="fmt-sep-v"></div>
+  <input type="number" class="fmt-size-input" id="fmtSizeInput" title="글자 크기(px)" min="8" max="120" value="14" onmousedown="event.stopPropagation()" onchange="execFontSize(+this.value)">
+  <div class="fmt-sep-v"></div>
+  <input type="color" class="fmt-color-input" id="fmtColorInput" title="글자색" value="#000000" onmousedown="event.stopPropagation()" onchange="execColor(this.value)">
+  <div class="fmt-sep-v"></div>
+  <button class="fmt-btn" title="서식 지우기" onmousedown="event.preventDefault()" onclick="clearFmt()" style="font-size:10px;width:auto;padding:0 6px;">지우기</button>
+</div>
 
 <!-- E-BOOK VIEWER -->
 <div id="viewerOverlay" class="viewer-overlay">
@@ -668,7 +692,7 @@ function buildTextPage(pg, idx) {
     <div class="page-body">
       <div class="page-sec-title" contenteditable="true" spellcheck="false" onblur="onTitleBlur('${pg.id}',this)">${esc(pg.title)}</div>
       <div class="page-sec-divider" style="background:${state.accentColor}"></div>
-      <div class="page-content-area" contenteditable="true" spellcheck="false" onblur="onBodyBlur('${pg.id}',this)">${esc(pg.body)}</div>
+      <div class="page-content-area" contenteditable="true" spellcheck="false" onblur="onBodyBlur('${pg.id}',this)">${renderBodyHtml(pg.body)}</div>
     </div>
     ${footerHtml(idx+3)}`;
   applyTextStyles(div, pg);
@@ -706,7 +730,7 @@ function buildImagePage(pg, idx) {
       ` : `
         <div class="pg-side-title" contenteditable="true" spellcheck="false" onblur="onSideTitleBlur('${pg.id}',this)" style="display:none"></div>
       `}
-      <div class="pg-side-body" contenteditable="true" spellcheck="false" onblur="onSideBodyBlur('${pg.id}',this)">${esc(pg.sideBody||'텍스트를 입력하세요.\n\n제품 설명, 특징, 사양 등을 자유롭게 작성하세요.')}</div>
+      <div class="pg-side-body" contenteditable="true" spellcheck="false" onblur="onSideBodyBlur('${pg.id}',this)">${renderBodyHtml(pg.sideBody||'텍스트를 입력하세요.\n\n제품 설명, 특징, 사양 등을 자유롭게 작성하세요.')}</div>
     </div>`;
 
     imgHtml = `<div class="pg-images layout-${layout}" style="flex:1;">
@@ -748,9 +772,9 @@ function buildImagePage(pg, idx) {
       <div class="page-body">
         <div class="page-sec-title" contenteditable="true" spellcheck="false" onblur="onTitleBlur('${pg.id}',this)">${esc(pg.title)}</div>
         <div class="page-sec-divider" style="background:${state.accentColor}"></div>
-        ${pg.body ? `<div class="page-content-area" style="margin-bottom:16px;" contenteditable="true" spellcheck="false" onblur="onBodyBlur('${pg.id}',this)">${esc(pg.body)}</div>` : ''}
+        ${pg.body ? `<div class="page-content-area" style="margin-bottom:16px;" contenteditable="true" spellcheck="false" onblur="onBodyBlur('${pg.id}',this)">${renderBodyHtml(pg.body)}</div>` : ''}
         ${gridHtml}
-        ${pg.bodyBottom ? `<div class="page-content-area" style="margin-top:16px;" contenteditable="true" spellcheck="false" onblur="onBodyBottomBlur('${pg.id}',this)">${esc(pg.bodyBottom)}</div>` : ''}
+        ${pg.bodyBottom ? `<div class="page-content-area" style="margin-top:16px;" contenteditable="true" spellcheck="false" onblur="onBodyBottomBlur('${pg.id}',this)">${renderBodyHtml(pg.bodyBottom)}</div>` : ''}
       </div>
       ${footerHtml(idx+3)}`;
 
@@ -781,9 +805,9 @@ function buildImagePage(pg, idx) {
       <div class="page-body">
         <div class="page-sec-title" contenteditable="true" spellcheck="false" onblur="onTitleBlur('${pg.id}',this)">${esc(pg.title)}</div>
         <div class="page-sec-divider" style="background:${state.accentColor}"></div>
-        ${pg.body ? `<div class="page-content-area" style="margin-bottom:16px;" contenteditable="true" spellcheck="false" onblur="onBodyBlur('${pg.id}',this)">${esc(pg.body)}</div>` : ''}
+        ${pg.body ? `<div class="page-content-area" style="margin-bottom:16px;" contenteditable="true" spellcheck="false" onblur="onBodyBlur('${pg.id}',this)">${renderBodyHtml(pg.body)}</div>` : ''}
         ${gridHtml}
-        ${pg.bodyBottom ? `<div class="page-content-area" style="margin-top:16px;" contenteditable="true" spellcheck="false" onblur="onBodyBottomBlur('${pg.id}',this)">${esc(pg.bodyBottom)}</div>` : ''}
+        ${pg.bodyBottom ? `<div class="page-content-area" style="margin-top:16px;" contenteditable="true" spellcheck="false" onblur="onBodyBottomBlur('${pg.id}',this)">${renderBodyHtml(pg.bodyBottom)}</div>` : ''}
       </div>
       ${footerHtml(idx+3)}`;
 
@@ -811,9 +835,9 @@ function buildImagePage(pg, idx) {
       <div class="page-body">
         <div class="page-sec-title" contenteditable="true" spellcheck="false" onblur="onTitleBlur('${pg.id}',this)">${esc(pg.title)}</div>
         <div class="page-sec-divider" style="background:${state.accentColor}"></div>
-        ${pg.body ? `<div class="page-content-area" style="margin-bottom:16px;" contenteditable="true" spellcheck="false" onblur="onBodyBlur('${pg.id}',this)">${esc(pg.body)}</div>` : ''}
+        ${pg.body ? `<div class="page-content-area" style="margin-bottom:16px;" contenteditable="true" spellcheck="false" onblur="onBodyBlur('${pg.id}',this)">${renderBodyHtml(pg.body)}</div>` : ''}
         ${gridHtml}
-        ${pg.bodyBottom ? `<div class="page-content-area" style="margin-top:16px;" contenteditable="true" spellcheck="false" onblur="onBodyBottomBlur('${pg.id}',this)">${esc(pg.bodyBottom)}</div>` : ''}
+        ${pg.bodyBottom ? `<div class="page-content-area" style="margin-top:16px;" contenteditable="true" spellcheck="false" onblur="onBodyBottomBlur('${pg.id}',this)">${renderBodyHtml(pg.bodyBottom)}</div>` : ''}
       </div>
       ${footerHtml(idx+3)}`;
   }
@@ -891,7 +915,7 @@ function onTitleBlur(id, el) {
 }
 function onBodyBlur(id, el) {
   const pg = state.pages.find(p=>p.id===id);
-  if (pg) pg.body = el.innerText;
+  if (pg) pg.body = el.innerHTML;
 }
 function onSideTitleBlur(id, el) {
   const pg = state.pages.find(p=>p.id===id);
@@ -899,11 +923,11 @@ function onSideTitleBlur(id, el) {
 }
 function onSideBodyBlur(id, el) {
   const pg = state.pages.find(p=>p.id===id);
-  if (pg) pg.sideBody = el.innerText;
+  if (pg) pg.sideBody = el.innerHTML;
 }
 function onBodyBottomBlur(id, el) {
   const pg = state.pages.find(p=>p.id===id);
-  if (pg) pg.bodyBottom = el.innerText;
+  if (pg) pg.bodyBottom = el.innerHTML;
 }
 
 // ── RIGHT PANEL ──
@@ -1019,8 +1043,8 @@ function buildTextPanel(pg) {
       <div class="field-label">페이지 제목</div>
       <input class="field-input" value="${esc(pg.title)}" oninput="state.pages[${idx}].title=this.value;renderCanvas();renderSidebar()">
       <div class="field-label">본문</div>
-      <textarea class="field-textarea" rows="8" oninput="state.pages[${idx}].body=this.value;renderCanvas()">${esc(pg.body)}</textarea>
-      <div class="field-hint">캔버스에서 직접 클릭하여 편집할 수도 있습니다.</div>
+      <textarea class="field-textarea" rows="8" oninput="state.pages[${idx}].body=this.value;renderCanvas()">${/<[a-zA-Z]/.test(pg.body||'') ? '(캔버스에서 서식 편집 중)' : esc(pg.body)}</textarea>
+      <div class="field-hint">캔버스에서 직접 클릭해 글자 크기·색상을 지정하세요. 여기에 입력하면 캔버스 서식이 초기화됩니다.</div>
     </div>
     ${styleSection(pg, idx)}
     <div class="panel-section">
@@ -1781,6 +1805,12 @@ function esc(str) {
   if (str==null) return '';
   return String(str).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
 }
+function renderBodyHtml(str) {
+  if (str==null) return '';
+  // If already HTML (contains tags), return as-is; otherwise escape plain text
+  if (/<[a-zA-Z]/.test(str)) return str;
+  return esc(str).replace(/\n/g,'<br>');
+}
 
 ['saveModal','loadModal','pdfImportModal'].forEach(id=>{
   document.getElementById(id).addEventListener('click', e=>{
@@ -1791,6 +1821,177 @@ function esc(str) {
 document.addEventListener('keydown', e=>{
   if((e.ctrlKey||e.metaKey)&&e.key==='s'){e.preventDefault();openSaveModal();}
 });
+
+// ────────────────────────────────────────
+// FORMAT BAR
+// ────────────────────────────────────────
+(function() {
+  const bar = document.getElementById('formatBar');
+  let _savedRange = null;
+  let _activeEl = null;
+
+  function _isEditableBody(el) {
+    return el && el.isContentEditable &&
+      (el.classList.contains('page-content-area') || el.classList.contains('pg-side-body'));
+  }
+
+  function _saveSel() {
+    const sel = window.getSelection();
+    if (sel && sel.rangeCount > 0) {
+      _savedRange = sel.getRangeAt(0).cloneRange();
+    }
+  }
+
+  function _restoreSel() {
+    if (!_savedRange) return;
+    const sel = window.getSelection();
+    sel.removeAllRanges();
+    sel.addRange(_savedRange);
+  }
+
+  function _positionBar(rect) {
+    const bw = bar.offsetWidth || 220;
+    let x = rect.left + (rect.width - bw) / 2;
+    x = Math.max(8, Math.min(x, window.innerWidth - bw - 8));
+    let y = rect.top - bar.offsetHeight - 8;
+    if (y < 8) y = rect.bottom + 8;
+    bar.style.left = x + 'px';
+    bar.style.top  = y + 'px';
+  }
+
+  function _updateState() {
+    bar.querySelectorAll('.fmt-btn[data-cmd]').forEach(btn => {
+      try {
+        btn.classList.toggle('on', document.queryCommandState(btn.dataset.cmd));
+      } catch(e) {}
+    });
+    // font size
+    const sizeEl = document.getElementById('fmtSizeInput');
+    if (sizeEl) {
+      const node = window.getSelection()?.anchorNode;
+      const el = node ? (node.nodeType === 3 ? node.parentElement : node) : null;
+      if (el) {
+        const fs = parseFloat(window.getComputedStyle(el).fontSize);
+        if (!isNaN(fs)) sizeEl.value = Math.round(fs);
+      }
+    }
+    // color
+    const colorEl = document.getElementById('fmtColorInput');
+    if (colorEl) {
+      try {
+        const hex = rgbToHex(document.queryCommandValue('foreColor'));
+        if (hex) colorEl.value = hex;
+      } catch(e) {}
+    }
+  }
+
+  function _showBar(rect) {
+    bar.style.display = 'flex';
+    _positionBar(rect);
+    _updateState();
+  }
+
+  function _hideBar() {
+    bar.style.display = 'none';
+    _savedRange = null;
+  }
+
+  document.addEventListener('selectionchange', () => {
+    const sel = window.getSelection();
+    if (!sel || sel.isCollapsed || !sel.rangeCount) {
+      // slight delay so clicks on bar buttons don't immediately hide it
+      setTimeout(() => {
+        const s2 = window.getSelection();
+        if (!s2 || s2.isCollapsed) _hideBar();
+      }, 120);
+      return;
+    }
+    const anchor = sel.anchorNode;
+    const el = anchor ? (anchor.nodeType === 3 ? anchor.parentElement : anchor) : null;
+    const editEl = el ? el.closest('[contenteditable="true"]') : null;
+    if (!_isEditableBody(editEl)) { _hideBar(); return; }
+    _activeEl = editEl;
+    _saveSel();
+    const range = sel.getRangeAt(0);
+    const rect = range.getBoundingClientRect();
+    _showBar(rect);
+  });
+
+  window.execFmt = function(cmd) {
+    _restoreSel();
+    document.execCommand(cmd, false, null);
+    _saveSel();
+    _updateState();
+    if (_activeEl) _activeEl.dispatchEvent(new Event('input'));
+  };
+
+  window.execFontSize = function(px) {
+    if (!px || px < 8) return;
+    _restoreSel();
+    _wrapWithStyle('font-size', px + 'px');
+    _updateState();
+    if (_activeEl) _activeEl.dispatchEvent(new Event('input'));
+  };
+
+  window.execColor = function(hex) {
+    _restoreSel();
+    document.execCommand('foreColor', false, hex);
+    _saveSel();
+    _updateState();
+    if (_activeEl) _activeEl.dispatchEvent(new Event('input'));
+  };
+
+  window.clearFmt = function() {
+    _restoreSel();
+    document.execCommand('removeFormat', false, null);
+    // also strip inline style spans
+    const sel = window.getSelection();
+    if (sel && sel.rangeCount) {
+      const range = sel.getRangeAt(0);
+      const frag = range.extractContents();
+      const walker = document.createTreeWalker(frag, NodeFilter.SHOW_ELEMENT);
+      let node;
+      while ((node = walker.nextNode())) {
+        if (node.tagName === 'SPAN') {
+          node.removeAttribute('style');
+        }
+      }
+      range.insertNode(frag);
+    }
+    _saveSel();
+    _updateState();
+    if (_activeEl) _activeEl.dispatchEvent(new Event('input'));
+  };
+
+  window._wrapWithStyle = function(prop, val) {
+    const sel = window.getSelection();
+    if (!sel || sel.isCollapsed || !sel.rangeCount) return;
+    const range = sel.getRangeAt(0);
+    const span = document.createElement('span');
+    span.style[prop] = val;
+    try {
+      range.surroundContents(span);
+    } catch(e) {
+      // selection spans multiple elements — extract + wrap
+      const frag = range.extractContents();
+      span.appendChild(frag);
+      range.insertNode(span);
+    }
+    sel.removeAllRanges();
+    const newRange = document.createRange();
+    newRange.selectNodeContents(span);
+    sel.addRange(newRange);
+    _savedRange = newRange.cloneRange();
+  };
+
+  window.rgbToHex = function(rgb) {
+    if (!rgb) return null;
+    if (rgb.startsWith('#')) return rgb;
+    const m = rgb.match(/\d+/g);
+    if (!m || m.length < 3) return null;
+    return '#' + m.slice(0,3).map(n => parseInt(n).toString(16).padStart(2,'0')).join('');
+  };
+})();
 
 init();
 
