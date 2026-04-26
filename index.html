@@ -1617,6 +1617,53 @@ function onLoadFileSelect(input) {
 // ────────────────────────────────────────
 // PDF EXPORT
 // ────────────────────────────────────────
+
+// html2canvas는 object-fit CSS를 무시함 → 이미지를 미리 캔버스로 직접 크롭
+async function prepareImagesForExport(el) {
+  const imgs = Array.from(el.querySelectorAll('img[src]'));
+  await Promise.all(imgs.map(async img => {
+    if (!img.complete || !img.naturalWidth) {
+      await new Promise(r => { img.onload = r; img.onerror = r; });
+    }
+    if (!img.naturalWidth) return;
+    try {
+      const rect  = img.getBoundingClientRect();
+      const W = Math.round(rect.width);
+      const H = Math.round(rect.height);
+      if (!W || !H) return;
+
+      const fit = getComputedStyle(img).objectFit || img.style.objectFit || 'cover';
+      const iw = img.naturalWidth, ih = img.naturalHeight;
+
+      const c = document.createElement('canvas');
+      c.width = W; c.height = H;
+      const ctx = c.getContext('2d');
+      ctx.fillStyle = '#f8f8f6';
+      ctx.fillRect(0, 0, W, H);
+
+      if (fit === 'cover') {
+        const scale = Math.max(W / iw, H / ih);
+        const sw = W / scale, sh = H / scale;
+        const sx = (iw - sw) / 2, sy = (ih - sh) / 2;
+        ctx.drawImage(img, sx, sy, sw, sh, 0, 0, W, H);
+      } else if (fit === 'contain') {
+        const scale = Math.min(W / iw, H / ih);
+        const dw = iw * scale, dh = ih * scale;
+        ctx.drawImage(img, 0, 0, iw, ih, (W - dw) / 2, (H - dh) / 2, dw, dh);
+      } else {
+        ctx.drawImage(img, 0, 0, W, H);
+      }
+
+      img.src = c.toDataURL('image/jpeg', 0.95);
+      img.style.objectFit = 'fill';
+      img.style.width  = W + 'px';
+      img.style.height = H + 'px';
+      img.style.minWidth = 'unset';
+      img.style.maxWidth = 'unset';
+    } catch (e) { /* CORS 등 오류 시 스킵 */ }
+  }));
+}
+
 async function exportPDF() {
   showToast('PDF 생성 중... 잠시 기다려주세요');
 
@@ -1654,6 +1701,9 @@ async function exportPDF() {
         img.complete ? Promise.resolve() :
         new Promise(r => { img.onload = r; img.onerror = r; })
       ));
+
+      // object-fit 직접 적용 (html2canvas는 object-fit 미지원)
+      await prepareImagesForExport(el);
 
       // 브라우저 렌더링 사이클 2회 대기
       await new Promise(r => requestAnimationFrame(() => requestAnimationFrame(r)));
