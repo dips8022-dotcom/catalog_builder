@@ -684,8 +684,8 @@ function buildImagePage(pg, idx) {
 
   let imgHtml = '';
 
-  const _imgH_side = pg.imageHeight !== undefined ? pg.imageHeight : 320;
-  const _imgH_grid = pg.imageHeight !== undefined ? pg.imageHeight : defaultImgH(layout);
+  const _imgH_side = getRowHeight(pg, 0);
+  const _imgH_grid = getRowHeight(pg, 0);
   const _imgFit = pg.imageFit || 'cover';
 
   if (layout === 'img-left' || layout === 'img-right') {
@@ -737,11 +737,10 @@ function buildImagePage(pg, idx) {
     };
     let topRow = `<div style="display:flex;gap:14px;">`;
     for (let i = 0; i < topCount; i++) {
-      topRow += makeImgItem(imgs[i], captions[i] || '', _imgH_grid);
+      topRow += makeImgItem(imgs[i], captions[i] || '', getRowHeight(pg, 0));
     }
     topRow += '</div>';
-    const botH = Math.round(_imgH_grid * 1.3);
-    const botItem = makeImgItem(imgs[topCount], captions[topCount] || '', botH);
+    const botItem = makeImgItem(imgs[topCount], captions[topCount] || '', getRowHeight(pg, 1));
     const gridHtml = `<div style="display:flex;flex-direction:column;gap:14px;">${topRow}${botItem}</div>`;
 
     div.innerHTML = `
@@ -768,10 +767,11 @@ function buildImagePage(pg, idx) {
     };
     let gridHtml = '<div style="display:flex;flex-direction:column;gap:14px;">';
     for (let r = 0; r < rows; r++) {
+      const rowH = getRowHeight(pg, r);
       gridHtml += '<div style="display:flex;gap:14px;">';
       for (let c = 0; c < cols; c++) {
         const i = r * cols + c;
-        gridHtml += mkItem(imgs[i], captions[i] || '', _imgH_grid);
+        gridHtml += mkItem(imgs[i], captions[i] || '', rowH);
       }
       gridHtml += '</div>';
     }
@@ -1083,14 +1083,24 @@ function buildImagePanel(pg) {
   }
 
   // image height & fit controls
-  const defaultH = isSideLayout ? 320 : defaultImgH(layout);
-  const curH = pg.imageHeight !== undefined ? pg.imageHeight : defaultH;
+  const rowCount = layoutRowCount(layout);
   const curFit = pg.imageFit || 'cover';
-  slotsHtml += `
-    <div class="field-label" style="margin-top:8px;">이미지 높이 <span id="imgH_${idx}" style="float:right;font-weight:400;color:#888;">${curH}px</span></div>
-    <input type="range" style="width:100%;accent-color:var(--primary);margin-bottom:8px;"
-      min="80" max="600" step="10" value="${curH}"
-      oninput="setImgHeight(${idx},+this.value)">
+
+  const _rowLabel = (r) => {
+    if (rowCount === 1) return '이미지 높이';
+    if (layout === '2b' || layout === '3b') return r === 0 ? '상단 높이' : '하단 높이';
+    return `${r + 1}단 높이`;
+  };
+  let heightSliders = '';
+  for (let r = 0; r < rowCount; r++) {
+    const rh = getRowHeight(pg, r);
+    heightSliders += `
+      <div class="field-label" style="margin-top:8px;">${_rowLabel(r)} <span id="imgRowH_${idx}_${r}" style="float:right;font-weight:400;color:#888;">${rh}px</span></div>
+      <input type="range" style="width:100%;accent-color:var(--primary);margin-bottom:6px;"
+        min="80" max="600" step="10" value="${rh}"
+        oninput="setRowHeight(${idx},${r},+this.value)">`;
+  }
+  slotsHtml += heightSliders + `
     <div class="field-label">이미지 맞춤</div>
     <div class="img-layout-row" style="margin-bottom:4px;">
       <button class="img-layout-btn${curFit==='cover'?' active':''}" onclick="setImgFit(${idx},'cover')">채우기</button>
@@ -1339,6 +1349,23 @@ function defaultImgH(layout) {
   return 200;
 }
 
+// 레이아웃별 행(단) 수
+function layoutRowCount(layout) {
+  if (layout === '2b' || layout === '3b') return 2;
+  const m = layout.match(/^(\d+)x(\d+)$/);
+  if (m) return parseInt(m[1]);
+  return 1;
+}
+
+// 행별 높이 (rowHeights 배열 우선, 없으면 imageHeight 레거시, 없으면 기본값)
+function getRowHeight(pg, rowIdx) {
+  const layout = pg.imageLayout || '2';
+  const defH = layout === 'img-left' || layout === 'img-right' ? 320 : defaultImgH(layout);
+  if (pg.rowHeights && pg.rowHeights[rowIdx] !== undefined) return pg.rowHeights[rowIdx];
+  if (pg.imageHeight !== undefined) return pg.imageHeight;
+  return defH;
+}
+
 function setImgLayout(pageIdx, layout) {
   const pg = state.pages[pageIdx];
   if (!pg) return;
@@ -1354,6 +1381,7 @@ function setImgLayout(pageIdx, layout) {
   if (isSide && !pg.sideBody) pg.sideBody = '텍스트를 입력하세요.\n\n제품 설명, 특징, 사양 등을 자유롭게 작성하세요.';
   // reset height to layout default when layout changes
   delete pg.imageHeight;
+  delete pg.rowHeights;
   renderCanvas();
   renderPanel();
 }
@@ -1362,8 +1390,16 @@ function setImgHeight(pageIdx, h) {
   const pg = state.pages[pageIdx];
   if (!pg) return;
   pg.imageHeight = h;
-  const el = document.getElementById('imgH_' + pageIdx);
-  if (el) el.textContent = h + 'px';
+  renderCanvas();
+}
+
+function setRowHeight(pageIdx, rowIdx, val) {
+  const pg = state.pages[pageIdx];
+  if (!pg) return;
+  if (!pg.rowHeights) pg.rowHeights = [];
+  pg.rowHeights[rowIdx] = val;
+  const span = document.getElementById('imgRowH_' + pageIdx + '_' + rowIdx);
+  if (span) span.textContent = val + 'px';
   renderCanvas();
 }
 
