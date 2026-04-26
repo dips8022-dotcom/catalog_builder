@@ -2281,7 +2281,8 @@ function exportEbook() {
   const title = state.projectName || '이북';
 
   const fns = [
-    esc, todayStr, headerHtml, footerHtml, defaultImgH, applyTextStyles,
+    esc, renderBodyHtml, todayStr, headerHtml, footerHtml,
+    defaultImgH, layoutRowCount, getRowHeight, applyTextStyles,
     buildCover, buildToc, buildTextPage, buildImagePage, buildPdfPage, buildContact,
     _vScale, _vScaleSpread, _vSpreadPages, _vSpreadNext, _vSpreadPrev,
     _vSpreadTotalCount, _vSpreadIndexOf, _vRenderSpread, _vRender,
