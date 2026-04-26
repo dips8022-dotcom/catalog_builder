@@ -1679,6 +1679,31 @@ function onLoadFileSelect(input) {
 // ────────────────────────────────────────
 
 // html2canvas는 object-fit CSS를 무시함 → 이미지를 미리 캔버스로 직접 크롭
+function _getImgBgColor(img) {
+  // 이미지 뒤에 있는 실제 배경색을 DOM 트리에서 찾아 반환
+  let node = img.parentElement;
+  while (node && node !== document.documentElement) {
+    const bg = getComputedStyle(node).backgroundColor;
+    if (bg && bg !== 'rgba(0, 0, 0, 0)' && bg !== 'transparent') return bg;
+    node = node.parentElement;
+  }
+  return '#ffffff';
+}
+
+function _hasTransparency(img) {
+  // 이미지 파일명이나 src가 PNG인지 빠르게 확인
+  const src = img.src || '';
+  if (/\.png($|\?)/i.test(src) || src.startsWith('data:image/png')) return true;
+  // naturalWidth가 있으면 1x1 픽셀로 샘플링해서 알파채널 확인
+  try {
+    const tc = document.createElement('canvas');
+    tc.width = 1; tc.height = 1;
+    const tctx = tc.getContext('2d');
+    tctx.drawImage(img, 0, 0, img.naturalWidth, img.naturalHeight, 0, 0, 1, 1);
+    return tctx.getImageData(0, 0, 1, 1).data[3] < 255;
+  } catch(e) { return false; }
+}
+
 async function prepareImagesForExport(el) {
   const imgs = Array.from(el.querySelectorAll('img[src]'));
   await Promise.all(imgs.map(async img => {
@@ -1687,7 +1712,7 @@ async function prepareImagesForExport(el) {
     }
     if (!img.naturalWidth) return;
     try {
-      const rect  = img.getBoundingClientRect();
+      const rect = img.getBoundingClientRect();
       const W = Math.round(rect.width);
       const H = Math.round(rect.height);
       if (!W || !H) return;
@@ -1698,7 +1723,10 @@ async function prepareImagesForExport(el) {
       const c = document.createElement('canvas');
       c.width = W; c.height = H;
       const ctx = c.getContext('2d');
-      ctx.fillStyle = '#ffffff';
+
+      // PNG 등 투명 배경 이미지는 실제 뒤 배경색으로 채움
+      const bgColor = _getImgBgColor(img);
+      ctx.fillStyle = bgColor;
       ctx.fillRect(0, 0, W, H);
 
       if (fit === 'cover') {
@@ -1829,7 +1857,8 @@ document.addEventListener('keydown', e=>{
 (function() {
   const bar = document.getElementById('formatBar');
   let _savedRange = null;
-  let _activeEl = null;
+  let _activeEl   = null;
+  let _lock       = false; // 툴바 조작 중 선택 해제 방지
 
   function _isEditableBody(el) {
     return el && el.isContentEditable &&
@@ -1838,20 +1867,24 @@ document.addEventListener('keydown', e=>{
 
   function _saveSel() {
     const sel = window.getSelection();
-    if (sel && sel.rangeCount > 0) {
+    if (sel && sel.rangeCount > 0 && !sel.isCollapsed) {
       _savedRange = sel.getRangeAt(0).cloneRange();
     }
   }
 
   function _restoreSel() {
-    if (!_savedRange) return;
-    const sel = window.getSelection();
-    sel.removeAllRanges();
-    sel.addRange(_savedRange);
+    if (!_savedRange) return false;
+    try {
+      const sel = window.getSelection();
+      sel.removeAllRanges();
+      sel.addRange(_savedRange);
+      return true;
+    } catch(e) { return false; }
   }
 
   function _positionBar(rect) {
-    const bw = bar.offsetWidth || 220;
+    bar.style.display = 'flex';
+    const bw = bar.offsetWidth || 240;
     let x = rect.left + (rect.width - bw) / 2;
     x = Math.max(8, Math.min(x, window.innerWidth - bw - 8));
     let y = rect.top - bar.offsetHeight - 8;
@@ -1862,90 +1895,104 @@ document.addEventListener('keydown', e=>{
 
   function _updateState() {
     bar.querySelectorAll('.fmt-btn[data-cmd]').forEach(btn => {
-      try {
-        btn.classList.toggle('on', document.queryCommandState(btn.dataset.cmd));
-      } catch(e) {}
+      try { btn.classList.toggle('on', document.queryCommandState(btn.dataset.cmd)); } catch(e) {}
     });
-    // font size
     const sizeEl = document.getElementById('fmtSizeInput');
-    if (sizeEl) {
-      const node = window.getSelection()?.anchorNode;
-      const el = node ? (node.nodeType === 3 ? node.parentElement : node) : null;
+    if (sizeEl && _savedRange) {
+      const node = _savedRange.startContainer;
+      const el = node.nodeType === 3 ? node.parentElement : node;
       if (el) {
         const fs = parseFloat(window.getComputedStyle(el).fontSize);
         if (!isNaN(fs)) sizeEl.value = Math.round(fs);
       }
     }
-    // color
     const colorEl = document.getElementById('fmtColorInput');
     if (colorEl) {
       try {
         const hex = rgbToHex(document.queryCommandValue('foreColor'));
-        if (hex) colorEl.value = hex;
+        if (hex && hex !== '#000000' || hex) colorEl.value = hex;
       } catch(e) {}
     }
   }
 
-  function _showBar(rect) {
-    bar.style.display = 'flex';
-    _positionBar(rect);
-    _updateState();
-  }
-
   function _hideBar() {
+    if (_lock) return;
     bar.style.display = 'none';
     _savedRange = null;
+    _activeEl   = null;
   }
 
+  // ── 툴바 mousedown: 선택 보존 ──
+  bar.addEventListener('mousedown', e => {
+    _saveSel(); // 포커스 이동 전에 먼저 저장
+    _lock = true;
+    if (e.target.tagName !== 'INPUT') {
+      e.preventDefault(); // 버튼 클릭 시 contenteditable 포커스 유지
+    }
+  });
+
+  // ── 입력창 blur 시 lock 해제 (약간 지연) ──
+  bar.querySelectorAll('input').forEach(inp => {
+    inp.addEventListener('blur', () => setTimeout(() => { _lock = false; }, 200));
+  });
+
+  // ── 마우스가 툴바 밖으로 나가고 입력창도 포커스 없으면 lock 해제 ──
+  bar.addEventListener('mouseleave', () => {
+    if (!bar.contains(document.activeElement)) _lock = false;
+  });
+
+  // ── 선택 변경 감지 ──
   document.addEventListener('selectionchange', () => {
     const sel = window.getSelection();
     if (!sel || sel.isCollapsed || !sel.rangeCount) {
-      // slight delay so clicks on bar buttons don't immediately hide it
       setTimeout(() => {
+        if (_lock) return;
         const s2 = window.getSelection();
         if (!s2 || s2.isCollapsed) _hideBar();
-      }, 120);
+      }, 150);
       return;
     }
     const anchor = sel.anchorNode;
     const el = anchor ? (anchor.nodeType === 3 ? anchor.parentElement : anchor) : null;
     const editEl = el ? el.closest('[contenteditable="true"]') : null;
-    if (!_isEditableBody(editEl)) { _hideBar(); return; }
+    if (!_isEditableBody(editEl)) { if (!_lock) _hideBar(); return; }
     _activeEl = editEl;
     _saveSel();
-    const range = sel.getRangeAt(0);
-    const rect = range.getBoundingClientRect();
-    _showBar(rect);
+    const rect = sel.getRangeAt(0).getBoundingClientRect();
+    _positionBar(rect);
+    _updateState();
   });
 
-  window.execFmt = function(cmd) {
-    _restoreSel();
-    document.execCommand(cmd, false, null);
+  // ── 서식 적용 공통 후처리 ──
+  function _afterFmt() {
     _saveSel();
     _updateState();
     if (_activeEl) _activeEl.dispatchEvent(new Event('input'));
+    _lock = false;
+  }
+
+  window.execFmt = function(cmd) {
+    if (!_restoreSel()) return;
+    document.execCommand(cmd, false, null);
+    _afterFmt();
   };
 
   window.execFontSize = function(px) {
     if (!px || px < 8) return;
-    _restoreSel();
-    _wrapWithStyle('font-size', px + 'px');
-    _updateState();
-    if (_activeEl) _activeEl.dispatchEvent(new Event('input'));
+    if (!_restoreSel()) return;
+    _wrapWithStyle('fontSize', px + 'px');
+    _afterFmt();
   };
 
   window.execColor = function(hex) {
-    _restoreSel();
+    if (!_restoreSel()) return;
     document.execCommand('foreColor', false, hex);
-    _saveSel();
-    _updateState();
-    if (_activeEl) _activeEl.dispatchEvent(new Event('input'));
+    _afterFmt();
   };
 
   window.clearFmt = function() {
-    _restoreSel();
+    if (!_restoreSel()) return;
     document.execCommand('removeFormat', false, null);
-    // also strip inline style spans
     const sel = window.getSelection();
     if (sel && sel.rangeCount) {
       const range = sel.getRangeAt(0);
@@ -1953,34 +2000,30 @@ document.addEventListener('keydown', e=>{
       const walker = document.createTreeWalker(frag, NodeFilter.SHOW_ELEMENT);
       let node;
       while ((node = walker.nextNode())) {
-        if (node.tagName === 'SPAN') {
-          node.removeAttribute('style');
-        }
+        if (node.tagName === 'SPAN') node.removeAttribute('style');
       }
       range.insertNode(frag);
     }
-    _saveSel();
-    _updateState();
-    if (_activeEl) _activeEl.dispatchEvent(new Event('input'));
+    _afterFmt();
   };
 
   window._wrapWithStyle = function(prop, val) {
     const sel = window.getSelection();
-    if (!sel || sel.isCollapsed || !sel.rangeCount) return;
+    if (!sel || !sel.rangeCount) return;
     const range = sel.getRangeAt(0);
+    if (range.collapsed) return;
     const span = document.createElement('span');
     span.style[prop] = val;
     try {
       range.surroundContents(span);
     } catch(e) {
-      // selection spans multiple elements — extract + wrap
       const frag = range.extractContents();
       span.appendChild(frag);
       range.insertNode(span);
     }
-    sel.removeAllRanges();
     const newRange = document.createRange();
     newRange.selectNodeContents(span);
+    sel.removeAllRanges();
     sel.addRange(newRange);
     _savedRange = newRange.cloneRange();
   };
