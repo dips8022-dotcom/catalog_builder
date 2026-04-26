@@ -290,6 +290,31 @@ body { font-family: Arial, 'Noto Sans KR', sans-serif; background: #e0e0dc; colo
 /* TOAST */
 .toast { position: fixed; bottom: 24px; left: 50%; transform: translateX(-50%) translateY(16px); background: var(--primary); color: white; padding: 10px 22px; border-radius: 2px; font-size: 12px; opacity: 0; transition: all .3s; z-index: 9999; pointer-events: none; }
 .toast.show { opacity: 1; transform: translateX(-50%) translateY(0); }
+
+/* ── E-BOOK VIEWER ── */
+.viewer-overlay { position: fixed; inset: 0; z-index: 10000; background: #0d0d1a; display: none; flex-direction: column; }
+.viewer-overlay.open { display: flex; }
+.viewer-bar { height: 54px; background: rgba(0,0,0,.55); border-bottom: 1px solid rgba(255,255,255,.07); display: flex; align-items: center; padding: 0 16px; gap: 8px; flex-shrink: 0; }
+.viewer-bar-title { font-size: 12px; color: rgba(255,255,255,.5); flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-family: Arial, 'Noto Sans KR', sans-serif; }
+.viewer-nav-btn { padding: 6px 14px; background: rgba(255,255,255,.1); color: rgba(255,255,255,.8); border: 1px solid rgba(255,255,255,.15); border-radius: 2px; font-size: 12px; cursor: pointer; transition: background .15s; font-family: inherit; }
+.viewer-nav-btn:hover:not(:disabled) { background: rgba(255,255,255,.22); }
+.viewer-nav-btn:disabled { opacity: .25; cursor: default; }
+.viewer-close-btn { padding: 6px 14px; background: rgba(192,57,43,.75); color: white; border: none; border-radius: 2px; font-size: 12px; cursor: pointer; transition: background .15s; font-family: inherit; }
+.viewer-close-btn:hover { background: #c0392b; }
+.viewer-pg-info { font-size: 12px; color: rgba(255,255,255,.4); min-width: 64px; text-align: center; }
+.viewer-stage { flex: 1; display: flex; align-items: center; justify-content: center; overflow: hidden; position: relative; perspective: 2500px; }
+.viewer-page-slot { border-radius: 2px; box-shadow: 0 28px 90px rgba(0,0,0,.8), 0 2px 10px rgba(0,0,0,.5); overflow: hidden; position: relative; flex-shrink: 0; background: white; }
+.viewer-page-inner { width: 794px; height: 1123px; position: absolute; top: 0; left: 0; transform-origin: 0 0; pointer-events: none; }
+.viewer-hint { height: 30px; display: flex; align-items: center; justify-content: center; font-size: 11px; color: rgba(255,255,255,.18); flex-shrink: 0; letter-spacing: .5px; font-family: Arial, sans-serif; }
+/* Book page-turn: pivot at left edge for forward, right edge for backward */
+.viewer-page-slot.book-fwd-out { transform-origin: left  center; animation: bookFwdOut .30s ease-in  forwards; }
+.viewer-page-slot.book-fwd-in  { transform-origin: left  center; animation: bookFwdIn  .34s ease-out forwards; }
+.viewer-page-slot.book-bwd-out { transform-origin: right center; animation: bookBwdOut .30s ease-in  forwards; }
+.viewer-page-slot.book-bwd-in  { transform-origin: right center; animation: bookBwdIn  .34s ease-out forwards; }
+@keyframes bookFwdOut { 0% { transform: rotateY(0deg);   box-shadow: 0 28px 90px rgba(0,0,0,.8); } 100% { transform: rotateY(-90deg); box-shadow: 4px 0 18px rgba(0,0,0,.3); } }
+@keyframes bookFwdIn  { 0% { transform: rotateY(90deg);  box-shadow: -4px 0 18px rgba(0,0,0,.3); } 100% { transform: rotateY(0deg);   box-shadow: 0 28px 90px rgba(0,0,0,.8); } }
+@keyframes bookBwdOut { 0% { transform: rotateY(0deg);   box-shadow: 0 28px 90px rgba(0,0,0,.8); } 100% { transform: rotateY(90deg);  box-shadow: -4px 0 18px rgba(0,0,0,.3); } }
+@keyframes bookBwdIn  { 0% { transform: rotateY(-90deg); box-shadow: 4px 0 18px rgba(0,0,0,.3); }  100% { transform: rotateY(0deg);   box-shadow: 0 28px 90px rgba(0,0,0,.8); } }
 </style>
 </head>
 <body>
@@ -305,6 +330,7 @@ body { font-family: Arial, 'Noto Sans KR', sans-serif; background: #e0e0dc; colo
   <button class="tb-btn" onclick="openSaveModal()">💾 저장</button>
   <button class="tb-btn" onclick="openLoadModal()">📂 불러오기</button>
   <div class="sep"></div>
+  <button class="tb-btn" onclick="openViewer()">📖 이북 보기</button>
   <button class="tb-btn red" onclick="exportPDF()">⬇ PDF 내보내기</button>
   <div class="tb-spacer"></div>
   <div class="tb-project" id="projectLabel">새 카탈로그</div>
@@ -391,6 +417,19 @@ body { font-family: Arial, 'Noto Sans KR', sans-serif; background: #e0e0dc; colo
 </div>
 
 <div class="toast" id="toast"></div>
+
+<!-- E-BOOK VIEWER -->
+<div id="viewerOverlay" class="viewer-overlay">
+  <div class="viewer-bar">
+    <span class="viewer-bar-title" id="viewerBarTitle">이북 미리보기</span>
+    <button class="viewer-nav-btn" id="viewerPrevBtn" onclick="viewerNavigate(-1)">◀ 이전</button>
+    <span class="viewer-pg-info" id="viewerPgInfo">1 / 1</span>
+    <button class="viewer-nav-btn" id="viewerNextBtn" onclick="viewerNavigate(1)">다음 ▶</button>
+    <button class="viewer-close-btn" onclick="closeViewer()">✕ 닫기</button>
+  </div>
+  <div class="viewer-stage" id="viewerStage"></div>
+  <div class="viewer-hint">◀ ▶ 방향키로 이동 &nbsp;·&nbsp; 화면 스와이프 가능 &nbsp;·&nbsp; ESC 닫기</div>
+</div>
 
 <script>
 // ── PDF.js worker ──
@@ -1649,6 +1688,129 @@ document.addEventListener('keydown', e=>{
 });
 
 init();
+
+// ────────────────────────────────────────
+// E-BOOK VIEWER
+// ────────────────────────────────────────
+let _vIdx = 0, _vTotal = 0, _vBusy = false, _vResizeTimer = null, _vTouchX = 0;
+
+function openViewer() {
+  _vTotal = 2 + state.pages.length + 1; // cover + toc + content pages + contact
+  _vIdx   = 0;
+  _vBusy  = false;
+  document.getElementById('viewerOverlay').classList.add('open');
+  _vRender(null, null);
+  _vUpdateInfo();
+  document.addEventListener('keydown', _vKeyHandler);
+  const stage = document.getElementById('viewerStage');
+  stage.addEventListener('touchstart', _vTouchStart, { passive: true });
+  stage.addEventListener('touchend',   _vTouchEnd,   { passive: true });
+  window.addEventListener('resize', _vOnResize);
+}
+
+function closeViewer() {
+  document.getElementById('viewerOverlay').classList.remove('open');
+  document.getElementById('viewerStage').innerHTML = '';
+  document.removeEventListener('keydown', _vKeyHandler);
+  const stage = document.getElementById('viewerStage');
+  stage.removeEventListener('touchstart', _vTouchStart);
+  stage.removeEventListener('touchend',   _vTouchEnd);
+  window.removeEventListener('resize', _vOnResize);
+}
+
+function viewerNavigate(dir) {
+  if (_vBusy) return;
+  const next = _vIdx + dir;
+  if (next < 0 || next >= _vTotal) return;
+  _vBusy = true;
+
+  const stage = document.getElementById('viewerStage');
+  const cur = stage.querySelector('.viewer-page-slot');
+  if (cur) cur.classList.add(dir > 0 ? 'book-fwd-out' : 'book-bwd-out');
+
+  setTimeout(() => {
+    _vIdx = next;
+    _vRender(cur, dir > 0 ? 'book-fwd-in' : 'book-bwd-in');
+    _vUpdateInfo();
+    setTimeout(() => { _vBusy = false; }, 360);
+  }, 280);
+}
+
+function _vRender(removeEl, inClass) {
+  const stage = document.getElementById('viewerStage');
+  if (removeEl) stage.removeChild(removeEl);
+
+  const scale = _vScale();
+  const slot = document.createElement('div');
+  slot.className = 'viewer-page-slot';
+  slot.style.width  = Math.floor(794 * scale) + 'px';
+  slot.style.height = Math.floor(1123 * scale) + 'px';
+  if (inClass) slot.classList.add(inClass);
+
+  const inner = document.createElement('div');
+  inner.className = 'viewer-page-inner';
+  inner.style.transform = `scale(${scale})`;
+
+  const pg = _vBuildContent(_vIdx);
+  inner.appendChild(pg);
+  slot.appendChild(inner);
+  stage.appendChild(slot);
+}
+
+function _vBuildContent(idx) {
+  let el;
+  if      (idx === 0)           el = buildCover();
+  else if (idx === 1)           el = buildToc();
+  else if (idx === _vTotal - 1) el = buildContact();
+  else {
+    const pi = idx - 2;
+    const pg = state.pages[pi];
+    if (!pg) { el = document.createElement('div'); el.style.cssText='width:794px;height:1123px;background:#fff;'; }
+    else if (pg.type === 'pdf')   el = buildPdfPage(pg, pi);
+    else if (pg.type === 'image') el = buildImagePage(pg, pi);
+    else                          el = buildTextPage(pg, pi);
+  }
+  // 뷰어에서는 편집 불가
+  el.querySelectorAll('[contenteditable]').forEach(e => e.removeAttribute('contenteditable'));
+  return el;
+}
+
+function _vScale() {
+  const stage = document.getElementById('viewerStage');
+  const sw = Math.max(stage.clientWidth  - 60,  300);
+  const sh = Math.max(stage.clientHeight - 20, 400);
+  return Math.min(sw / 794, sh / 1123, 1);
+}
+
+function _vUpdateInfo() {
+  const labels = ['표지', '목차', ...state.pages.map((p, i) => `${i + 3}p · ${p.title || ''}`.trim()), '연락처'];
+  document.getElementById('viewerBarTitle').textContent =
+    (state.projectName || '이북 미리보기') + '  ·  ' + (labels[_vIdx] || '');
+  document.getElementById('viewerPgInfo').textContent = `${_vIdx + 1} / ${_vTotal}`;
+  document.getElementById('viewerPrevBtn').disabled = _vIdx === 0;
+  document.getElementById('viewerNextBtn').disabled = _vIdx === _vTotal - 1;
+}
+
+function _vKeyHandler(e) {
+  if (e.key === 'ArrowRight' || e.key === 'ArrowDown')  viewerNavigate(1);
+  else if (e.key === 'ArrowLeft' || e.key === 'ArrowUp') viewerNavigate(-1);
+  else if (e.key === 'Escape') closeViewer();
+}
+
+function _vTouchStart(e) { _vTouchX = e.touches[0].clientX; }
+function _vTouchEnd(e) {
+  const dx = e.changedTouches[0].clientX - _vTouchX;
+  if (Math.abs(dx) > 50) viewerNavigate(dx < 0 ? 1 : -1);
+}
+
+function _vOnResize() {
+  clearTimeout(_vResizeTimer);
+  _vResizeTimer = setTimeout(() => {
+    const stage = document.getElementById('viewerStage');
+    stage.innerHTML = '';
+    _vRender(null, null);
+  }, 180);
+}
 </script>
 </body>
 </html>
