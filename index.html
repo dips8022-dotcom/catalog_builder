@@ -1978,54 +1978,53 @@ document.addEventListener('keydown', e=>{
   };
 
   window.execFontSize = function(px) {
-    if (!px || px < 8) return;
-    if (!_restoreSel()) return;
-    _wrapWithStyle('fontSize', px + 'px');
+    px = parseInt(px);
+    if (!px || px < 8) { _lock = false; return; }
+    if (!_restoreSel()) { _lock = false; return; }
+
+    // execCommand('fontSize')로 선택 범위를 <font size="7"> 태그로 표시
+    // → 볼드/이탤릭과 동일 방식이라 다중 엘리먼트 선택도 안정적으로 처리
+    document.execCommand('fontSize', false, '7');
+
+    // <font size="7">를 <span style="font-size:Npx">로 교체
+    if (_activeEl) {
+      _activeEl.querySelectorAll('font[size="7"]').forEach(font => {
+        const span = document.createElement('span');
+        span.style.fontSize = px + 'px';
+        span.innerHTML = font.innerHTML;
+        font.replaceWith(span);
+      });
+    }
     _afterFmt();
   };
 
   window.execColor = function(hex) {
-    if (!_restoreSel()) return;
+    if (!_restoreSel()) { _lock = false; return; }
     document.execCommand('foreColor', false, hex);
     _afterFmt();
   };
 
   window.clearFmt = function() {
-    if (!_restoreSel()) return;
+    if (!_restoreSel()) { _lock = false; return; }
     document.execCommand('removeFormat', false, null);
+    // font-size 스팬도 정리
     const sel = window.getSelection();
-    if (sel && sel.rangeCount) {
+    if (sel && sel.rangeCount && _activeEl) {
+      // 선택 범위 안의 fontSize 스팬 제거
       const range = sel.getRangeAt(0);
       const frag = range.extractContents();
-      const walker = document.createTreeWalker(frag, NodeFilter.SHOW_ELEMENT);
-      let node;
-      while ((node = walker.nextNode())) {
-        if (node.tagName === 'SPAN') node.removeAttribute('style');
-      }
+      Array.from(frag.querySelectorAll('span[style]')).forEach(s => {
+        s.style.fontSize = '';
+        s.style.color = '';
+        if (!s.getAttribute('style').trim()) {
+          const parent = s.parentNode;
+          while (s.firstChild) parent.insertBefore(s.firstChild, s);
+          parent.removeChild(s);
+        }
+      });
       range.insertNode(frag);
     }
     _afterFmt();
-  };
-
-  window._wrapWithStyle = function(prop, val) {
-    const sel = window.getSelection();
-    if (!sel || !sel.rangeCount) return;
-    const range = sel.getRangeAt(0);
-    if (range.collapsed) return;
-    const span = document.createElement('span');
-    span.style[prop] = val;
-    try {
-      range.surroundContents(span);
-    } catch(e) {
-      const frag = range.extractContents();
-      span.appendChild(frag);
-      range.insertNode(span);
-    }
-    const newRange = document.createRange();
-    newRange.selectNodeContents(span);
-    sel.removeAllRanges();
-    sel.addRange(newRange);
-    _savedRange = newRange.cloneRange();
   };
 
   window.rgbToHex = function(rgb) {
