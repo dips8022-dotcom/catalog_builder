@@ -306,15 +306,32 @@ body { font-family: Arial, 'Noto Sans KR', sans-serif; background: #e0e0dc; colo
 .viewer-page-slot { border-radius: 2px; box-shadow: 0 28px 90px rgba(0,0,0,.8), 0 2px 10px rgba(0,0,0,.5); overflow: hidden; position: relative; flex-shrink: 0; background: white; }
 .viewer-page-inner { width: 794px; height: 1123px; position: absolute; top: 0; left: 0; transform-origin: 0 0; pointer-events: none; }
 .viewer-hint { height: 30px; display: flex; align-items: center; justify-content: center; font-size: 11px; color: rgba(255,255,255,.18); flex-shrink: 0; letter-spacing: .5px; font-family: Arial, sans-serif; }
-/* Book page-turn: pivot at left edge for forward, right edge for backward */
-.viewer-page-slot.book-fwd-out { transform-origin: left  center; animation: bookFwdOut .30s ease-in  forwards; }
-.viewer-page-slot.book-fwd-in  { transform-origin: left  center; animation: bookFwdIn  .34s ease-out forwards; }
-.viewer-page-slot.book-bwd-out { transform-origin: right center; animation: bookBwdOut .30s ease-in  forwards; }
-.viewer-page-slot.book-bwd-in  { transform-origin: right center; animation: bookBwdIn  .34s ease-out forwards; }
+/* ── 단면 모드: 책 페이지 넘기기 (left/right edge pivot) ── */
+.vbook-fwd-out { transform-origin: left  center; animation: bookFwdOut .30s ease-in  forwards; }
+.vbook-fwd-in  { transform-origin: left  center; animation: bookFwdIn  .34s ease-out forwards; }
+.vbook-bwd-out { transform-origin: right center; animation: bookBwdOut .30s ease-in  forwards; }
+.vbook-bwd-in  { transform-origin: right center; animation: bookBwdIn  .34s ease-out forwards; }
 @keyframes bookFwdOut { 0% { transform: rotateY(0deg);   box-shadow: 0 28px 90px rgba(0,0,0,.8); } 100% { transform: rotateY(-90deg); box-shadow: 4px 0 18px rgba(0,0,0,.3); } }
 @keyframes bookFwdIn  { 0% { transform: rotateY(90deg);  box-shadow: -4px 0 18px rgba(0,0,0,.3); } 100% { transform: rotateY(0deg);   box-shadow: 0 28px 90px rgba(0,0,0,.8); } }
 @keyframes bookBwdOut { 0% { transform: rotateY(0deg);   box-shadow: 0 28px 90px rgba(0,0,0,.8); } 100% { transform: rotateY(90deg);  box-shadow: -4px 0 18px rgba(0,0,0,.3); } }
 @keyframes bookBwdIn  { 0% { transform: rotateY(-90deg); box-shadow: 4px 0 18px rgba(0,0,0,.3); }  100% { transform: rotateY(0deg);   box-shadow: 0 28px 90px rgba(0,0,0,.8); } }
+/* ── 양면 모드: 슬라이드+원근 ── */
+.viewer-spread-wrap { display: flex; align-items: stretch; flex-shrink: 0; box-shadow: 0 28px 90px rgba(0,0,0,.8), 0 2px 10px rgba(0,0,0,.5); }
+.viewer-spread-page { overflow: hidden; position: relative; flex-shrink: 0; background: white; }
+.viewer-spread-blank { background: #16162a; }
+.viewer-spread-spine { width: 10px; flex-shrink: 0; background: linear-gradient(to right, rgba(0,0,0,.35) 0%, rgba(0,0,0,.06) 50%, rgba(0,0,0,.35) 100%); }
+.vspread-fwd-out { animation: spreadFwdOut .28s ease-in  forwards; }
+.vspread-fwd-in  { animation: spreadFwdIn  .32s ease-out forwards; }
+.vspread-bwd-out { animation: spreadBwdOut .28s ease-in  forwards; }
+.vspread-bwd-in  { animation: spreadBwdIn  .32s ease-out forwards; }
+@keyframes spreadFwdOut { 0% { transform: perspective(2500px) rotateY(0)      translateX(0);    opacity:1; } 100% { transform: perspective(2500px) rotateY(-6deg)  translateX(-50px); opacity:0; } }
+@keyframes spreadFwdIn  { 0% { transform: perspective(2500px) rotateY(6deg)   translateX(50px); opacity:0; } 100% { transform: perspective(2500px) rotateY(0)     translateX(0);    opacity:1; } }
+@keyframes spreadBwdOut { 0% { transform: perspective(2500px) rotateY(0)      translateX(0);    opacity:1; } 100% { transform: perspective(2500px) rotateY(6deg)   translateX(50px); opacity:0; } }
+@keyframes spreadBwdIn  { 0% { transform: perspective(2500px) rotateY(-6deg)  translateX(-50px); opacity:0; } 100% { transform: perspective(2500px) rotateY(0)     translateX(0);    opacity:1; } }
+/* 보기 모드 토글 버튼 */
+.viewer-mode-btn { padding: 5px 11px; background: rgba(255,255,255,.07); color: rgba(255,255,255,.65); border: 1px solid rgba(255,255,255,.13); border-radius: 2px; font-size: 11px; cursor: pointer; transition: all .15s; font-family: inherit; white-space: nowrap; }
+.viewer-mode-btn:hover { background: rgba(255,255,255,.16); color: rgba(255,255,255,.9); }
+.viewer-mode-btn.on { background: rgba(100,149,237,.22); border-color: rgba(100,149,237,.5); color: rgba(200,220,255,.95); }
 </style>
 </head>
 <body>
@@ -331,6 +348,7 @@ body { font-family: Arial, 'Noto Sans KR', sans-serif; background: #e0e0dc; colo
   <button class="tb-btn" onclick="openLoadModal()">📂 불러오기</button>
   <div class="sep"></div>
   <button class="tb-btn" onclick="openViewer()">📖 이북 보기</button>
+  <button class="tb-btn" onclick="exportEbook()">🔖 이북 저장</button>
   <button class="tb-btn red" onclick="exportPDF()">⬇ PDF 내보내기</button>
   <div class="tb-spacer"></div>
   <div class="tb-project" id="projectLabel">새 카탈로그</div>
@@ -422,6 +440,7 @@ body { font-family: Arial, 'Noto Sans KR', sans-serif; background: #e0e0dc; colo
 <div id="viewerOverlay" class="viewer-overlay">
   <div class="viewer-bar">
     <span class="viewer-bar-title" id="viewerBarTitle">이북 미리보기</span>
+    <button class="viewer-mode-btn" id="viewerModeBtn" onclick="toggleViewerMode()">양면 보기</button>
     <button class="viewer-nav-btn" id="viewerPrevBtn" onclick="viewerNavigate(-1)">◀ 이전</button>
     <span class="viewer-pg-info" id="viewerPgInfo">1 / 1</span>
     <button class="viewer-nav-btn" id="viewerNextBtn" onclick="viewerNavigate(1)">다음 ▶</button>
@@ -1692,6 +1711,7 @@ init();
 // ────────────────────────────────────────
 // E-BOOK VIEWER
 // ────────────────────────────────────────
+let _vMode = 'single';
 let _vIdx = 0, _vTotal = 0, _vBusy = false, _vResizeTimer = null, _vTouchX = 0;
 
 function openViewer() {
@@ -1699,6 +1719,7 @@ function openViewer() {
   _vIdx   = 0;
   _vBusy  = false;
   document.getElementById('viewerOverlay').classList.add('open');
+  _vUpdateModeBtn();
   _vRender(null, null);
   _vUpdateInfo();
   document.addEventListener('keydown', _vKeyHandler);
@@ -1720,17 +1741,27 @@ function closeViewer() {
 
 function viewerNavigate(dir) {
   if (_vBusy) return;
-  const next = _vIdx + dir;
-  if (next < 0 || next >= _vTotal) return;
+  let next;
+  if (_vMode === 'single') {
+    next = _vIdx + dir;
+    if (next < 0 || next >= _vTotal) return;
+  } else {
+    next = dir > 0 ? _vSpreadNext(_vIdx) : _vSpreadPrev(_vIdx);
+    if (next === null) return;
+  }
   _vBusy = true;
 
+  const isSpread = _vMode === 'spread';
+  const outCls = dir > 0 ? (isSpread ? 'vspread-fwd-out' : 'vbook-fwd-out') : (isSpread ? 'vspread-bwd-out' : 'vbook-bwd-out');
+  const inCls  = dir > 0 ? (isSpread ? 'vspread-fwd-in'  : 'vbook-fwd-in')  : (isSpread ? 'vspread-bwd-in'  : 'vbook-bwd-in');
+
   const stage = document.getElementById('viewerStage');
-  const cur = stage.querySelector('.viewer-page-slot');
-  if (cur) cur.classList.add(dir > 0 ? 'book-fwd-out' : 'book-bwd-out');
+  const cur = stage.querySelector('.viewer-page-slot, .viewer-spread-wrap');
+  if (cur) cur.classList.add(outCls);
 
   setTimeout(() => {
     _vIdx = next;
-    _vRender(cur, dir > 0 ? 'book-fwd-in' : 'book-bwd-in');
+    _vRender(cur, inCls);
     _vUpdateInfo();
     setTimeout(() => { _vBusy = false; }, 360);
   }, 280);
@@ -1739,6 +1770,7 @@ function viewerNavigate(dir) {
 function _vRender(removeEl, inClass) {
   const stage = document.getElementById('viewerStage');
   if (removeEl) stage.removeChild(removeEl);
+  if (_vMode === 'spread') { _vRenderSpread(stage, inClass); return; }
 
   const scale = _vScale();
   const slot = document.createElement('div');
@@ -1751,8 +1783,7 @@ function _vRender(removeEl, inClass) {
   inner.className = 'viewer-page-inner';
   inner.style.transform = `scale(${scale})`;
 
-  const pg = _vBuildContent(_vIdx);
-  inner.appendChild(pg);
+  inner.appendChild(_vBuildContent(_vIdx));
   slot.appendChild(inner);
   stage.appendChild(slot);
 }
@@ -1782,13 +1813,112 @@ function _vScale() {
   return Math.min(sw / 794, sh / 1123, 1);
 }
 
+function _vScaleSpread() {
+  const stage = document.getElementById('viewerStage');
+  const sw = Math.max(stage.clientWidth  - 80, 300);
+  const sh = Math.max(stage.clientHeight - 20, 400);
+  return Math.min((sw - 10) / (794 * 2), sh / 1123, 1);
+}
+
+function _vSpreadPages(idx) {
+  if (idx === 0) return [null, 0];
+  const right = (idx + 1) < _vTotal ? idx + 1 : null;
+  return [idx, right];
+}
+
+function _vSpreadNext(idx) {
+  const next = idx === 0 ? 1 : idx + 2;
+  return next < _vTotal ? next : null;
+}
+
+function _vSpreadPrev(idx) {
+  if (idx === 0) return null;
+  if (idx === 1) return 0;
+  return idx - 2;
+}
+
+function _vSpreadTotalCount() {
+  return 1 + Math.ceil((_vTotal - 1) / 2);
+}
+
+function _vSpreadIndexOf(idx) {
+  if (idx === 0) return 0;
+  return Math.floor((idx + 1) / 2);
+}
+
+function _vRenderSpread(stage, inClass) {
+  const scale = _vScaleSpread();
+  const [leftIdx, rightIdx] = _vSpreadPages(_vIdx);
+  const W = Math.floor(794 * scale);
+  const H = Math.floor(1123 * scale);
+
+  const wrap = document.createElement('div');
+  wrap.className = 'viewer-spread-wrap';
+  if (inClass) wrap.classList.add(inClass);
+
+  function makeSpreadPage(pageIdx) {
+    const pg = document.createElement('div');
+    pg.className = 'viewer-spread-page' + (pageIdx === null ? ' viewer-spread-blank' : '');
+    pg.style.width  = W + 'px';
+    pg.style.height = H + 'px';
+    if (pageIdx !== null) {
+      const inner = document.createElement('div');
+      inner.className = 'viewer-page-inner';
+      inner.style.transform = `scale(${scale})`;
+      inner.appendChild(_vBuildContent(pageIdx));
+      pg.appendChild(inner);
+    }
+    return pg;
+  }
+
+  const spine = document.createElement('div');
+  spine.className = 'viewer-spread-spine';
+  spine.style.height = H + 'px';
+
+  wrap.appendChild(makeSpreadPage(leftIdx));
+  wrap.appendChild(spine);
+  wrap.appendChild(makeSpreadPage(rightIdx));
+  stage.appendChild(wrap);
+}
+
+function toggleViewerMode() {
+  if (_vMode === 'single') {
+    _vMode = 'spread';
+    if (_vIdx > 0 && _vIdx % 2 === 0) _vIdx = _vIdx - 1;
+  } else {
+    _vMode = 'single';
+  }
+  _vUpdateModeBtn();
+  const stage = document.getElementById('viewerStage');
+  stage.innerHTML = '';
+  _vRender(null, null);
+  _vUpdateInfo();
+}
+
+function _vUpdateModeBtn() {
+  const btn = document.getElementById('viewerModeBtn');
+  if (!btn) return;
+  if (_vMode === 'spread') { btn.textContent = '단면 보기'; btn.classList.add('on'); }
+  else                     { btn.textContent = '양면 보기'; btn.classList.remove('on'); }
+}
+
 function _vUpdateInfo() {
   const labels = ['표지', '목차', ...state.pages.map((p, i) => `${i + 3}p · ${p.title || ''}`.trim()), '연락처'];
-  document.getElementById('viewerBarTitle').textContent =
-    (state.projectName || '이북 미리보기') + '  ·  ' + (labels[_vIdx] || '');
-  document.getElementById('viewerPgInfo').textContent = `${_vIdx + 1} / ${_vTotal}`;
-  document.getElementById('viewerPrevBtn').disabled = _vIdx === 0;
-  document.getElementById('viewerNextBtn').disabled = _vIdx === _vTotal - 1;
+  const base = state.projectName || '이북 미리보기';
+  if (_vMode === 'single') {
+    document.getElementById('viewerBarTitle').textContent = base + '  ·  ' + (labels[_vIdx] || '');
+    document.getElementById('viewerPgInfo').textContent = `${_vIdx + 1} / ${_vTotal}`;
+    document.getElementById('viewerPrevBtn').disabled = _vIdx === 0;
+    document.getElementById('viewerNextBtn').disabled = _vIdx === _vTotal - 1;
+  } else {
+    const [l, r] = _vSpreadPages(_vIdx);
+    const parts = [l !== null ? labels[l] : '', r !== null ? labels[r] : ''].filter(Boolean);
+    document.getElementById('viewerBarTitle').textContent = base + '  ·  ' + parts.join(' / ');
+    const si = _vSpreadIndexOf(_vIdx) + 1;
+    document.getElementById('viewerPgInfo').textContent = `${si} / ${_vSpreadTotalCount()}`;
+    document.getElementById('viewerPrevBtn').disabled = _vSpreadPrev(_vIdx) === null;
+    document.getElementById('viewerNextBtn').disabled = _vSpreadNext(_vIdx) === null;
+  }
 }
 
 function _vKeyHandler(e) {
@@ -1810,6 +1940,79 @@ function _vOnResize() {
     stage.innerHTML = '';
     _vRender(null, null);
   }, 180);
+}
+
+// ────────────────────────────────────────
+// EBOOK EXPORT (standalone HTML)
+// ────────────────────────────────────────
+function exportEbook() {
+  const css = document.querySelector('style').textContent;
+  const stateJson = JSON.stringify(state);
+  const title = state.projectName || '이북';
+
+  const fns = [
+    esc, todayStr, headerHtml, footerHtml, defaultImgH, applyTextStyles,
+    buildCover, buildToc, buildTextPage, buildImagePage, buildPdfPage, buildContact,
+    _vScale, _vScaleSpread, _vSpreadPages, _vSpreadNext, _vSpreadPrev,
+    _vSpreadTotalCount, _vSpreadIndexOf, _vRenderSpread, _vRender,
+    _vBuildContent, _vUpdateModeBtn, _vUpdateInfo, viewerNavigate, toggleViewerMode,
+    _vKeyHandler, _vTouchStart, _vTouchEnd, _vOnResize
+  ].map(f => f.toString()).join('\n\n');
+
+  const html = `<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>${esc(title)}</title>
+<style>
+* { box-sizing: border-box; margin: 0; padding: 0; }
+body { background: #0d0d1a; overflow: hidden; height: 100vh; }
+${css}
+</style>
+</head>
+<body>
+<div id="viewerOverlay" class="viewer-overlay open">
+  <div class="viewer-bar">
+    <span class="viewer-bar-title" id="viewerBarTitle">${esc(title)}</span>
+    <button class="viewer-mode-btn" id="viewerModeBtn" onclick="toggleViewerMode()">양면 보기</button>
+    <button class="viewer-nav-btn" id="viewerPrevBtn" onclick="viewerNavigate(-1)">&#9664; 이전</button>
+    <span class="viewer-pg-info" id="viewerPgInfo">1 / 1</span>
+    <button class="viewer-nav-btn" id="viewerNextBtn" onclick="viewerNavigate(1)">다음 &#9654;</button>
+  </div>
+  <div class="viewer-stage" id="viewerStage"></div>
+  <div class="viewer-hint">&#9664; &#9654; 방향키로 이동 &nbsp;·&nbsp; 화면 스와이프 가능</div>
+</div>
+<script>
+const state = ${stateJson};
+let _vMode = 'single';
+let _vIdx = 0, _vTotal = 0, _vBusy = false, _vResizeTimer = null, _vTouchX = 0;
+
+${fns}
+
+_vTotal = 2 + state.pages.length + 1;
+_vIdx = 0;
+_vBusy = false;
+_vUpdateModeBtn();
+_vRender(null, null);
+_vUpdateInfo();
+document.addEventListener('keydown', _vKeyHandler);
+const _s = document.getElementById('viewerStage');
+_s.addEventListener('touchstart', _vTouchStart, { passive: true });
+_s.addEventListener('touchend',   _vTouchEnd,   { passive: true });
+window.addEventListener('resize', _vOnResize);
+<\/script>
+</body>
+</html>`;
+
+  const blob = new Blob([html], { type: 'text/html' });
+  const url  = URL.createObjectURL(blob);
+  const a    = document.createElement('a');
+  a.href = url;
+  a.download = `${title}.html`;
+  a.click();
+  URL.revokeObjectURL(url);
+  showToast(`"${title}.html" 이북 저장 완료 ✓`);
 }
 </script>
 </body>
