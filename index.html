@@ -309,6 +309,11 @@ body { font-family: Arial, 'Noto Sans KR', sans-serif; background: #e0e0dc; colo
 .viewer-bar-title { font-size: 12px; color: rgba(255,255,255,.5); flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-family: Arial, 'Noto Sans KR', sans-serif; }
 .viewer-nav-btn { padding: 6px 14px; background: rgba(255,255,255,.1); color: rgba(255,255,255,.8); border: 1px solid rgba(255,255,255,.15); border-radius: 2px; font-size: 12px; cursor: pointer; transition: background .15s; font-family: inherit; }
 .viewer-nav-btn:hover:not(:disabled) { background: rgba(255,255,255,.22); }
+.viewer-sep { width: 1px; height: 22px; background: rgba(255,255,255,.1); flex-shrink: 0; }
+.viewer-zoom-btn { width: 28px; height: 28px; background: rgba(255,255,255,.1); color: rgba(255,255,255,.85); border: 1px solid rgba(255,255,255,.15); border-radius: 2px; font-size: 18px; line-height: 1; cursor: pointer; transition: background .15s; font-family: inherit; display: inline-flex; align-items: center; justify-content: center; padding: 0; flex-shrink: 0; }
+.viewer-zoom-btn:hover { background: rgba(255,255,255,.22); }
+.viewer-zoom-label { font-size: 11px; color: rgba(255,255,255,.55); min-width: 44px; text-align: center; cursor: pointer; user-select: none; letter-spacing: .3px; }
+.viewer-zoom-label:hover { color: rgba(255,255,255,.85); }
 .viewer-nav-btn:disabled { opacity: .25; cursor: default; }
 .viewer-close-btn { padding: 6px 14px; background: rgba(192,57,43,.75); color: white; border: none; border-radius: 2px; font-size: 12px; cursor: pointer; transition: background .15s; font-family: inherit; }
 .viewer-close-btn:hover { background: #c0392b; }
@@ -465,13 +470,18 @@ body { font-family: Arial, 'Noto Sans KR', sans-serif; background: #e0e0dc; colo
   <div class="viewer-bar">
     <span class="viewer-bar-title" id="viewerBarTitle">이북 미리보기</span>
     <button class="viewer-mode-btn" id="viewerModeBtn" onclick="toggleViewerMode()">양면 보기</button>
+    <div class="viewer-sep"></div>
+    <button class="viewer-zoom-btn" onclick="_vZoomOut()" title="축소 (−)">−</button>
+    <span class="viewer-zoom-label" id="vZoomLabel" onclick="_vZoomFit()" title="클릭: 화면에 맞춤">맞춤</span>
+    <button class="viewer-zoom-btn" onclick="_vZoomIn()" title="확대 (+)">+</button>
+    <div class="viewer-sep"></div>
     <button class="viewer-nav-btn" id="viewerPrevBtn" onclick="viewerNavigate(-1)">◀ 이전</button>
     <span class="viewer-pg-info" id="viewerPgInfo">1 / 1</span>
     <button class="viewer-nav-btn" id="viewerNextBtn" onclick="viewerNavigate(1)">다음 ▶</button>
     <button class="viewer-close-btn" onclick="closeViewer()">✕ 닫기</button>
   </div>
   <div class="viewer-stage" id="viewerStage"></div>
-  <div class="viewer-hint">◀ ▶ 방향키로 이동 &nbsp;·&nbsp; 화면 스와이프 가능 &nbsp;·&nbsp; ESC 닫기</div>
+  <div class="viewer-hint">◀ ▶ 방향키로 이동 &nbsp;·&nbsp; Ctrl+휠 확대/축소 &nbsp;·&nbsp; ESC 닫기</div>
 </div>
 
 <script>
@@ -2042,20 +2052,26 @@ init();
 // E-BOOK VIEWER
 // ────────────────────────────────────────
 let _vMode = 'single';
-let _vIdx = 0, _vTotal = 0, _vBusy = false, _vResizeTimer = null, _vTouchX = 0;
+let _vIdx = 0, _vTotal = 0, _vBusy = false, _vResizeTimer = null, _vTouchX = 0, _vTouchY = 0;
+let _vZoom = 1.0;
 
 function openViewer() {
-  _vTotal = 2 + state.pages.length + 1; // cover + toc + content pages + contact
+  _vTotal = 2 + state.pages.length + 1;
   _vIdx   = 0;
   _vBusy  = false;
+  _vZoom  = 1.0;
   document.getElementById('viewerOverlay').classList.add('open');
   _vUpdateModeBtn();
+  _vZoomUpdateLabel();
+  _vApplyScrollState();
   _vRender(null, null);
   _vUpdateInfo();
   document.addEventListener('keydown', _vKeyHandler);
   const stage = document.getElementById('viewerStage');
-  stage.addEventListener('touchstart', _vTouchStart, { passive: true });
+  stage.addEventListener('touchstart', _vTouchStart, { passive: false });
+  stage.addEventListener('touchmove',  _vTouchMove,  { passive: false });
   stage.addEventListener('touchend',   _vTouchEnd,   { passive: true });
+  stage.addEventListener('wheel',      _vWheelZoom,  { passive: false });
   window.addEventListener('resize', _vOnResize);
 }
 
@@ -2065,7 +2081,9 @@ function closeViewer() {
   document.removeEventListener('keydown', _vKeyHandler);
   const stage = document.getElementById('viewerStage');
   stage.removeEventListener('touchstart', _vTouchStart);
+  stage.removeEventListener('touchmove',  _vTouchMove);
   stage.removeEventListener('touchend',   _vTouchEnd);
+  stage.removeEventListener('wheel',      _vWheelZoom);
   window.removeEventListener('resize', _vOnResize);
 }
 
@@ -2107,6 +2125,7 @@ function _vRender(removeEl, inClass) {
   slot.className = 'viewer-page-slot';
   slot.style.width  = Math.floor(794 * scale) + 'px';
   slot.style.height = Math.floor(1123 * scale) + 'px';
+  if (_vZoom > 1) slot.style.margin = 'auto'; // display:block 중앙 정렬
   if (inClass) slot.classList.add(inClass);
 
   const inner = document.createElement('div');
@@ -2136,19 +2155,23 @@ function _vBuildContent(idx) {
   return el;
 }
 
-function _vScale() {
+function _vAutoScale() {
   const stage = document.getElementById('viewerStage');
   const sw = Math.max(stage.clientWidth  - 60,  300);
   const sh = Math.max(stage.clientHeight - 20, 400);
   return Math.min(sw / 794, sh / 1123, 1);
 }
 
-function _vScaleSpread() {
+function _vScale() { return _vAutoScale() * _vZoom; }
+
+function _vAutoScaleSpread() {
   const stage = document.getElementById('viewerStage');
   const sw = Math.max(stage.clientWidth  - 80, 300);
   const sh = Math.max(stage.clientHeight - 20, 400);
   return Math.min((sw - 10) / (794 * 2), sh / 1123, 1);
 }
+
+function _vScaleSpread() { return _vAutoScaleSpread() * _vZoom; }
 
 function _vSpreadPages(idx) {
   if (idx === 0) return [null, 0];
@@ -2182,8 +2205,11 @@ function _vRenderSpread(stage, inClass) {
   const W = Math.floor(794 * scale);
   const H = Math.floor(1123 * scale);
 
+  const spineW = 10;
   const wrap = document.createElement('div');
   wrap.className = 'viewer-spread-wrap';
+  wrap.style.width = (W * 2 + spineW) + 'px'; // margin:auto 정확한 계산을 위해 명시적 width 필요
+  if (_vZoom > 1) wrap.style.margin = 'auto';
   if (inClass) wrap.classList.add(inClass);
 
   function makeSpreadPage(pageIdx) {
@@ -2218,7 +2244,10 @@ function toggleViewerMode() {
   } else {
     _vMode = 'single';
   }
+  _vZoom = 1.0;
+  _vZoomUpdateLabel();
   _vUpdateModeBtn();
+  _vApplyScrollState();
   const stage = document.getElementById('viewerStage');
   stage.innerHTML = '';
   _vRender(null, null);
@@ -2252,20 +2281,118 @@ function _vUpdateInfo() {
 }
 
 function _vKeyHandler(e) {
-  if (e.key === 'ArrowRight' || e.key === 'ArrowDown')  viewerNavigate(1);
-  else if (e.key === 'ArrowLeft' || e.key === 'ArrowUp') viewerNavigate(-1);
-  else if (e.key === 'Escape') closeViewer();
+  if      (e.key === 'ArrowRight' || e.key === 'ArrowDown')  viewerNavigate(1);
+  else if (e.key === 'ArrowLeft'  || e.key === 'ArrowUp')    viewerNavigate(-1);
+  else if (e.key === 'Escape')                               closeViewer();
+  else if (e.key === '+' || e.key === '=') { e.preventDefault(); _vZoomIn(); }
+  else if (e.key === '-')                  { e.preventDefault(); _vZoomOut(); }
+  else if (e.key === '0')                  { e.preventDefault(); _vZoomFit(); }
 }
 
-function _vTouchStart(e) { _vTouchX = e.touches[0].clientX; }
+let _vPinchStartDist = 0, _vPinchEndDist = 0, _vPinchZoomBase = 1.0, _vWasPinch = false;
+
+function _vTouchStart(e) {
+  if (e.touches.length >= 2) {
+    // 핀치 시작 — 페이지 스크롤 방지
+    e.preventDefault();
+    _vWasPinch = true;
+    _vPinchZoomBase  = _vZoom;
+    _vPinchStartDist = Math.hypot(
+      e.touches[0].clientX - e.touches[1].clientX,
+      e.touches[0].clientY - e.touches[1].clientY
+    );
+    _vPinchEndDist = _vPinchStartDist;
+  } else {
+    _vWasPinch = false;
+    _vTouchX   = e.touches[0].clientX;
+    _vTouchY   = e.touches[0].clientY;
+  }
+}
+
+function _vTouchMove(e) {
+  if (e.touches.length >= 2) {
+    e.preventDefault(); // 브라우저 기본 핀치줌 억제
+    _vWasPinch = true;
+    _vPinchEndDist = Math.hypot(
+      e.touches[0].clientX - e.touches[1].clientX,
+      e.touches[0].clientY - e.touches[1].clientY
+    );
+  }
+}
+
 function _vTouchEnd(e) {
+  if (_vWasPinch) {
+    // 모든 손가락을 뗐을 때 최종 줌 적용
+    if (e.touches.length === 0 && _vPinchStartDist > 0) {
+      const ratio   = _vPinchEndDist / _vPinchStartDist;
+      const newZoom = Math.max(0.3, Math.min(4.0, +(_vPinchZoomBase * ratio).toFixed(1)));
+      if (Math.abs(newZoom - _vZoom) >= 0.05) _vZoomSet(newZoom);
+    }
+    _vWasPinch = false;
+    return; // 페이지 이동 금지
+  }
+  // 단일 손가락 스와이프 — 수평이 수직보다 1.5배 이상 + 60px 초과일 때만 이동
   const dx = e.changedTouches[0].clientX - _vTouchX;
-  if (Math.abs(dx) > 50) viewerNavigate(dx < 0 ? 1 : -1);
+  const dy = e.changedTouches[0].clientY - _vTouchY;
+  if (Math.abs(dx) > 60 && Math.abs(dx) > Math.abs(dy) * 1.5) {
+    viewerNavigate(dx < 0 ? 1 : -1);
+  }
+}
+
+function _vWheelZoom(e) {
+  if (!e.ctrlKey && !e.metaKey) return;
+  e.preventDefault();
+  if (e.deltaY < 0) _vZoomIn(); else _vZoomOut();
+}
+
+function _vZoomIn()  { _vZoomSet(Math.min(+(_vZoom + 0.2).toFixed(1), 4.0)); }
+function _vZoomOut() { _vZoomSet(Math.max(+(_vZoom - 0.2).toFixed(1), 0.3)); }
+function _vZoomFit() { _vZoomSet(1.0); }
+
+function _vZoomUpdateLabel() {
+  const lbl = document.getElementById('vZoomLabel');
+  if (lbl) lbl.textContent = _vZoom === 1.0 ? '맞춤' : Math.round(_vZoom * 100) + '%';
+}
+
+function _vApplyScrollState() {
+  const stage = document.getElementById('viewerStage');
+  if (!stage) return;
+  if (_vZoom > 1) {
+    // display:block + margin:auto 방식 — flex 오버플로 트랩 없이 중앙 정렬 + 스크롤 모두 동작
+    stage.style.overflow       = 'auto';
+    stage.style.display        = 'block';
+    stage.style.alignItems     = '';
+    stage.style.justifyContent = '';
+    stage.style.padding        = '24px';
+  } else {
+    stage.style.overflow       = 'hidden';
+    stage.style.display        = 'flex';
+    stage.style.alignItems     = 'center';
+    stage.style.justifyContent = 'center';
+    stage.style.padding        = '0';
+  }
+}
+
+function _vZoomSet(z) {
+  _vZoom = z;
+  _vZoomUpdateLabel();
+  _vApplyScrollState();
+  const stage = document.getElementById('viewerStage');
+  stage.innerHTML = '';
+  _vRender(null, null);
+  // 레이아웃 완료 후 중앙으로 스크롤 (브라우저 layout 확정 후 실행)
+  if (_vZoom > 1) {
+    setTimeout(() => {
+      stage.scrollTop  = Math.max(0, (stage.scrollHeight - stage.clientHeight) / 2);
+      stage.scrollLeft = Math.max(0, (stage.scrollWidth  - stage.clientWidth)  / 2);
+    }, 30);
+  }
 }
 
 function _vOnResize() {
   clearTimeout(_vResizeTimer);
   _vResizeTimer = setTimeout(() => {
+    _vApplyScrollState();
     const stage = document.getElementById('viewerStage');
     stage.innerHTML = '';
     _vRender(null, null);
@@ -2284,10 +2411,13 @@ function exportEbook() {
     esc, renderBodyHtml, todayStr, headerHtml, footerHtml,
     defaultImgH, layoutRowCount, getRowHeight, applyTextStyles,
     buildCover, buildToc, buildTextPage, buildImagePage, buildPdfPage, buildContact,
-    _vScale, _vScaleSpread, _vSpreadPages, _vSpreadNext, _vSpreadPrev,
+    _vAutoScale, _vScale, _vAutoScaleSpread, _vScaleSpread,
+    _vSpreadPages, _vSpreadNext, _vSpreadPrev,
     _vSpreadTotalCount, _vSpreadIndexOf, _vRenderSpread, _vRender,
     _vBuildContent, _vUpdateModeBtn, _vUpdateInfo, viewerNavigate, toggleViewerMode,
-    _vKeyHandler, _vTouchStart, _vTouchEnd, _vOnResize
+    _vKeyHandler, _vTouchStart, _vTouchMove, _vTouchEnd, _vWheelZoom,
+    _vZoomIn, _vZoomOut, _vZoomFit, _vZoomUpdateLabel, _vApplyScrollState, _vZoomSet,
+    _vOnResize
   ].map(f => f.toString()).join('\n\n');
 
   const html = `<!DOCTYPE html>
@@ -2307,30 +2437,42 @@ ${css}
   <div class="viewer-bar">
     <span class="viewer-bar-title" id="viewerBarTitle">${esc(title)}</span>
     <button class="viewer-mode-btn" id="viewerModeBtn" onclick="toggleViewerMode()">양면 보기</button>
+    <div class="viewer-sep"></div>
+    <button class="viewer-zoom-btn" onclick="_vZoomOut()" title="축소">&#8722;</button>
+    <span class="viewer-zoom-label" id="vZoomLabel" onclick="_vZoomFit()" title="화면에 맞춤">맞춤</span>
+    <button class="viewer-zoom-btn" onclick="_vZoomIn()" title="확대">+</button>
+    <div class="viewer-sep"></div>
     <button class="viewer-nav-btn" id="viewerPrevBtn" onclick="viewerNavigate(-1)">&#9664; 이전</button>
     <span class="viewer-pg-info" id="viewerPgInfo">1 / 1</span>
     <button class="viewer-nav-btn" id="viewerNextBtn" onclick="viewerNavigate(1)">다음 &#9654;</button>
   </div>
   <div class="viewer-stage" id="viewerStage"></div>
-  <div class="viewer-hint">&#9664; &#9654; 방향키로 이동 &nbsp;·&nbsp; 화면 스와이프 가능</div>
+  <div class="viewer-hint">&#9664; &#9654; 방향키로 이동 &nbsp;·&nbsp; Ctrl+휠 확대/축소</div>
 </div>
 <script>
 const state = ${stateJson};
 let _vMode = 'single';
 let _vIdx = 0, _vTotal = 0, _vBusy = false, _vResizeTimer = null, _vTouchX = 0;
+let _vZoom = 1.0;
+let _vPinchStartDist = 0, _vPinchEndDist = 0, _vPinchZoomBase = 1.0, _vWasPinch = false;
 
 ${fns}
 
 _vTotal = 2 + state.pages.length + 1;
 _vIdx = 0;
 _vBusy = false;
+_vZoom = 1.0;
 _vUpdateModeBtn();
+_vZoomUpdateLabel();
+_vApplyScrollState();
 _vRender(null, null);
 _vUpdateInfo();
 document.addEventListener('keydown', _vKeyHandler);
 const _s = document.getElementById('viewerStage');
-_s.addEventListener('touchstart', _vTouchStart, { passive: true });
+_s.addEventListener('touchstart', _vTouchStart, { passive: false });
+_s.addEventListener('touchmove',  _vTouchMove,  { passive: false });
 _s.addEventListener('touchend',   _vTouchEnd,   { passive: true });
+_s.addEventListener('wheel',      _vWheelZoom,  { passive: false });
 window.addEventListener('resize', _vOnResize);
 <\/script>
 </body>
