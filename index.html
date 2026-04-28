@@ -214,6 +214,8 @@ body { font-family: Arial, 'Noto Sans KR', sans-serif; background: #e0e0dc; colo
 .pg-text-side .pg-side-divider { width: 32px; height: 2px; margin-bottom: 14px; }
 
 .pg-img-caption { font-size: 11px; color: var(--muted); text-align: center; font-style: italic; }
+.pg-row-text-placeholder:empty:before { content: attr(data-placeholder); color: #bbb; font-size: 12px; pointer-events: none; }
+.pg-row-text-placeholder:focus { border-color: rgba(100,149,237,.5) !important; outline: none; }
 
 /* pdf-image page (full bleed between header & footer) */
 .pdf-img-page { flex: 1; display: flex; flex-direction: column; min-height: var(--page-h); }
@@ -724,16 +726,17 @@ function buildImagePage(pg, idx) {
 
   if (layout === 'img-left' || layout === 'img-right') {
     // ── Side-by-side: image + text ──
+    const imgW = pg.sideImageWidth || 50; // %
     const src = imgs[0] || null;
     const cap = captions[0] || '';
-    const imgBlock = `<div class="pg-img-side">
+    const imgBlock = `<div class="pg-img-side" style="flex:0 0 ${imgW}%;min-width:0;">
       ${src
-        ? `<img src="${src}" alt="" style="height:${_imgH_side}px;object-fit:${_imgFit};">`
+        ? `<img src="${src}" alt="" style="width:100%;height:${_imgH_side}px;object-fit:${_imgFit};">`
         : `<div class="pg-img-empty" style="height:${_imgH_side}px;"><span style="font-size:28px;opacity:.25;">🖼</span><span style="font-size:11px;color:#bbb;">이미지를 업로드하세요</span></div>`}
       ${cap ? `<div class="pg-img-caption">${esc(cap)}</div>` : ''}
     </div>`;
     const hasSideTitle = pg.sideTitle && pg.sideTitle.trim();
-    const textBlock = `<div class="pg-text-side">
+    const textBlock = `<div class="pg-text-side" style="flex:1;min-width:0;">
       ${hasSideTitle ? `
         <div class="pg-side-title" contenteditable="true" spellcheck="false" onblur="onSideTitleBlur('${pg.id}',this)">${esc(pg.sideTitle)}</div>
         <div class="pg-side-divider" style="background:${state.accentColor}"></div>
@@ -743,8 +746,23 @@ function buildImagePage(pg, idx) {
       <div class="pg-side-body" contenteditable="true" spellcheck="false" onblur="onSideBodyBlur('${pg.id}',this)">${renderBodyHtml(pg.sideBody||'텍스트를 입력하세요.\n\n제품 설명, 특징, 사양 등을 자유롭게 작성하세요.')}</div>
     </div>`;
 
-    imgHtml = `<div class="pg-images layout-${layout}" style="flex:1;">
-      ${layout === 'img-left' ? imgBlock + textBlock : textBlock + imgBlock}
+    // 하단 이미지 (선택)
+    const botSrc = (pg.hasBottomImage && imgs[1]) ? imgs[1] : null;
+    const botCap = (pg.hasBottomImage && captions[1]) ? captions[1] : '';
+    const botH = getRowHeight(pg, 1);
+    const bottomImgHtml = pg.hasBottomImage ? `
+      <div style="margin-top:14px;">
+        ${botSrc
+          ? `<img src="${botSrc}" alt="" style="width:100%;height:${botH}px;object-fit:${_imgFit};border-radius:2px;display:block;">`
+          : `<div style="width:100%;height:${botH}px;background:#f0efe9;border-radius:2px;display:flex;align-items:center;justify-content:center;flex-direction:column;gap:8px;border:1.5px dashed #ddd;"><span style="font-size:28px;opacity:.25;">🖼</span><span style="font-size:11px;color:#bbb;">이미지를 업로드하세요</span></div>`}
+        ${botCap ? `<div class="pg-img-caption">${esc(botCap)}</div>` : ''}
+      </div>` : '';
+
+    imgHtml = `<div style="flex:1;display:flex;flex-direction:column;">
+      <div class="pg-images layout-${layout}" style="flex:1;">
+        ${layout === 'img-left' ? imgBlock + textBlock : textBlock + imgBlock}
+      </div>
+      ${bottomImgHtml}
     </div>`;
 
     div.innerHTML = `
@@ -774,8 +792,11 @@ function buildImagePage(pg, idx) {
       topRow += makeImgItem(imgs[i], captions[i] || '', getRowHeight(pg, 0));
     }
     topRow += '</div>';
+    const midText = (pg.rowTexts && pg.rowTexts[0])
+      ? `<div class="page-content-area" style="margin:8px 0;" contenteditable="true" spellcheck="false" onblur="onRowTextBlur('${pg.id}',0,this)">${renderBodyHtml(pg.rowTexts[0])}</div>`
+      : `<div class="page-content-area pg-row-text-placeholder" style="margin:4px 0;min-height:28px;border:1.5px dashed #e0e0d8;border-radius:2px;padding:6px 8px;color:#bbb;font-size:12px;" contenteditable="true" spellcheck="false" onblur="onRowTextBlur('${pg.id}',0,this)" data-placeholder="이미지 사이 텍스트 (클릭하여 입력)"></div>`;
     const botItem = makeImgItem(imgs[topCount], captions[topCount] || '', getRowHeight(pg, 1));
-    const gridHtml = `<div style="display:flex;flex-direction:column;gap:14px;">${topRow}${botItem}</div>`;
+    const gridHtml = `<div style="display:flex;flex-direction:column;gap:6px;">${topRow}${midText}${botItem}</div>`;
 
     div.innerHTML = `
       ${headerHtml(pg.title)}
@@ -799,7 +820,7 @@ function buildImagePage(pg, idx) {
       if (cap) html += `<div class="pg-img-caption">${esc(cap)}</div>`;
       return html + '</div>';
     };
-    let gridHtml = '<div style="display:flex;flex-direction:column;gap:14px;">';
+    let gridHtml = '<div style="display:flex;flex-direction:column;gap:6px;">';
     for (let r = 0; r < rows; r++) {
       const rowH = getRowHeight(pg, r);
       gridHtml += '<div style="display:flex;gap:14px;">';
@@ -808,6 +829,11 @@ function buildImagePage(pg, idx) {
         gridHtml += mkItem(imgs[i], captions[i] || '', rowH);
       }
       gridHtml += '</div>';
+      // 행 사이 텍스트
+      if (r < rows - 1) {
+        const rt = pg.rowTexts && pg.rowTexts[r] ? pg.rowTexts[r] : '';
+        gridHtml += `<div class="page-content-area pg-row-text-placeholder" style="margin:2px 0;min-height:28px;${rt?'':'border:1.5px dashed #e0e0d8;padding:6px 8px;color:#bbb;font-size:12px;'}" contenteditable="true" spellcheck="false" onblur="onRowTextBlur('${pg.id}',${r},this)">${rt ? renderBodyHtml(rt) : ''}</div>`;
+      }
     }
     gridHtml += '</div>';
     div.innerHTML = `
@@ -938,6 +964,29 @@ function onSideBodyBlur(id, el) {
 function onBodyBottomBlur(id, el) {
   const pg = state.pages.find(p=>p.id===id);
   if (pg) pg.bodyBottom = el.innerHTML;
+}
+function onRowTextBlur(id, rowIdx, el) {
+  const pg = state.pages.find(p=>p.id===id);
+  if (pg) { if (!pg.rowTexts) pg.rowTexts = []; pg.rowTexts[rowIdx] = el.innerHTML; }
+}
+function setSideImageWidth(pageIdx, val) {
+  const pg = state.pages[pageIdx];
+  if (!pg) return;
+  pg.sideImageWidth = val;
+  const span = document.getElementById('sideImgW_' + pageIdx);
+  if (span) span.textContent = val + '%';
+  renderCanvas();
+}
+function toggleBottomImage(pageIdx) {
+  const pg = state.pages[pageIdx];
+  if (!pg) return;
+  pg.hasBottomImage = !pg.hasBottomImage;
+  if (!pg.images) pg.images = [];
+  if (pg.hasBottomImage && pg.images.length < 2) pg.images.push(null);
+  if (!pg.captions) pg.captions = [];
+  if (pg.hasBottomImage && pg.captions.length < 2) pg.captions.push('');
+  renderCanvas();
+  renderPanel();
 }
 
 // ── RIGHT PANEL ──
@@ -1102,7 +1151,11 @@ function buildImagePanel(pg) {
 
   // image upload slots
   let slotsHtml = '';
-  const slotCount = layoutSlotCount(layout);
+  // img-left/img-right: slot 0 = side image, slot 1 = bottom image (if hasBottomImage)
+  const baseSlotCount = isSideLayout
+    ? (pg.hasBottomImage ? 2 : 1)
+    : layoutSlotCount(layout);
+  const slotCount = baseSlotCount;
   for (let i = 0; i < slotCount; i++) {
     const src = imgs[i];
     slotsHtml += `<div class="img-slot-wrap">
@@ -1117,10 +1170,11 @@ function buildImagePanel(pg) {
   }
 
   // image height & fit controls
-  const rowCount = layoutRowCount(layout);
+  const rowCount = isSideLayout ? (pg.hasBottomImage ? 2 : 1) : layoutRowCount(layout);
   const curFit = pg.imageFit || 'cover';
 
   const _rowLabel = (r) => {
+    if (isSideLayout) return r === 0 ? '이미지 높이' : '하단 이미지 높이';
     if (rowCount === 1) return '이미지 높이';
     if (layout === '2b' || layout === '3b') return r === 0 ? '상단 높이' : '하단 높이';
     return `${r + 1}단 높이`;
@@ -1134,12 +1188,37 @@ function buildImagePanel(pg) {
         min="80" max="600" step="10" value="${rh}"
         oninput="setRowHeight(${idx},${r},+this.value)">`;
   }
-  slotsHtml += heightSliders + `
+
+  // img-left/img-right 전용: 이미지 가로폭 + 하단 이미지 토글
+  const sideExtraHtml = isSideLayout ? (() => {
+    const imgW = pg.sideImageWidth || 50;
+    return `
+      <div class="field-label" style="margin-top:8px;">이미지 가로폭 <span id="sideImgW_${idx}" style="float:right;font-weight:400;color:#888;">${imgW}%</span></div>
+      <input type="range" style="width:100%;accent-color:var(--primary);margin-bottom:6px;"
+        min="20" max="80" step="5" value="${imgW}"
+        oninput="setSideImageWidth(${idx},+this.value)">
+      <div style="display:flex;align-items:center;gap:8px;margin-top:4px;margin-bottom:4px;">
+        <label style="font-size:12px;color:#555;cursor:pointer;display:flex;align-items:center;gap:6px;">
+          <input type="checkbox" ${pg.hasBottomImage?'checked':''} onchange="toggleBottomImage(${idx})">
+          하단 이미지 추가
+        </label>
+      </div>`;
+  })() : '';
+
+  slotsHtml += sideExtraHtml + heightSliders + `
     <div class="field-label">이미지 맞춤</div>
     <div class="img-layout-row" style="margin-bottom:4px;">
       <button class="img-layout-btn${curFit==='cover'?' active':''}" onclick="setImgFit(${idx},'cover')">채우기</button>
       <button class="img-layout-btn${curFit==='contain'?' active':''}" onclick="setImgFit(${idx},'contain')">맞춤</button>
     </div>`;
+
+  // 행간 텍스트 슬롯 수 계산
+  const midTextCount = (() => {
+    if (layout === '2b' || layout === '3b') return 1;
+    const m = layout.match(/^(\d+)x\d+$/);
+    if (m) return Math.max(0, parseInt(m[1]) - 1);
+    return 0;
+  })();
 
   // side-layout text fields
   const sideTextHtml = isSideLayout ? `
@@ -1150,13 +1229,17 @@ function buildImagePanel(pg) {
         oninput="state.pages[${idx}].sideTitle=this.value;renderCanvas()">
       <div class="field-label">본문 텍스트</div>
       <textarea class="field-textarea" rows="10"
-        oninput="state.pages[${idx}].sideBody=this.value;renderCanvas()">${esc(pg.sideBody||'텍스트를 입력하세요.\n\n제품 설명, 특징, 사양 등을 자유롭게 작성하세요.')}</textarea>
+        oninput="state.pages[${idx}].sideBody=this.value;renderCanvas()">${/<[a-zA-Z]/.test(pg.sideBody||'') ? '(캔버스에서 서식 편집 중)' : esc(pg.sideBody||'텍스트를 입력하세요.\n\n제품 설명, 특징, 사양 등을 자유롭게 작성하세요.')}</textarea>
     </div>` : `
     <div class="panel-section">
       <div class="panel-heading">텍스트 영역</div>
       <div class="field-label">이미지 위 텍스트 (선택)</div>
       <textarea class="field-textarea" rows="3" placeholder="이미지 위에 표시할 설명 (없으면 비워두세요)"
         oninput="state.pages[${idx}].body=this.value;renderCanvas()">${esc(pg.body||'')}</textarea>
+      ${midTextCount > 0 ? Array.from({length: midTextCount}, (_, i) => `
+      <div class="field-label">이미지 사이 텍스트 ${midTextCount>1?i+1:''} (선택)</div>
+      <textarea class="field-textarea" rows="2" placeholder="이미지 행 사이에 표시할 텍스트"
+        oninput="if(!state.pages[${idx}].rowTexts)state.pages[${idx}].rowTexts=[];state.pages[${idx}].rowTexts[${i}]=this.value;renderCanvas()">${esc((pg.rowTexts&&pg.rowTexts[i])||'')}</textarea>`).join('') : ''}
       <div class="field-label">이미지 아래 텍스트 (선택)</div>
       <textarea class="field-textarea" rows="3" placeholder="이미지 아래에 표시할 설명 (없으면 비워두세요)"
         oninput="state.pages[${idx}].bodyBottom=this.value;renderCanvas()">${esc(pg.bodyBottom||'')}</textarea>
@@ -1359,8 +1442,8 @@ function onPageDragEnd() {
     el.classList.remove('dragging', 'drag-over-top', 'drag-over-bottom'));
 }
 
-function layoutSlotCount(layout) {
-  if (layout === 'img-left' || layout === 'img-right') return 1;
+function layoutSlotCount(layout, pg) {
+  if (layout === 'img-left' || layout === 'img-right') return (pg && pg.hasBottomImage) ? 2 : 1;
   if (layout === '2b') return 3;
   if (layout === '3b') return 4;
   const m = layout.match(/^(\d+)x(\d+)$/);
@@ -1405,7 +1488,7 @@ function setImgLayout(pageIdx, layout) {
   if (!pg) return;
   pg.imageLayout = layout;
   const isSide = layout === 'img-left' || layout === 'img-right';
-  const n = layoutSlotCount(layout);
+  const n = layoutSlotCount(layout, pg);
   if (!pg.images) pg.images = [];
   if (!pg.captions) pg.captions = [];
   while (pg.images.length < n) pg.images.push(null);
