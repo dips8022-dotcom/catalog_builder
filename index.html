@@ -751,7 +751,7 @@ function buildImagePage(pg, idx) {
       <div class="pg-side-body" contenteditable="true" spellcheck="false" onblur="onSideBodyBlur('${pg.id}',this)">${renderBodyHtml(pg.sideBody||'텍스트를 입력하세요.\n\n제품 설명, 특징, 사양 등을 자유롭게 작성하세요.')}</div>
     </div>`;
 
-    // 하단 이미지 (_isB) 또는 텍스트 (_isBT) — 해당 레이아웃은 항상 하단 포함
+    // 하단: _isB = 동일 사이드 레이아웃, _isBT = 전체 텍스트, hasBottomImage = 전체 이미지
     const _hasBot = _isB || pg.hasBottomImage;
     let bottomImgHtml = '';
     if (_isBT) {
@@ -761,6 +761,33 @@ function buildImagePage(pg, idx) {
           ? `<div class="page-content-area" style="min-height:60px;" contenteditable="true" spellcheck="false" onblur="onRowTextBlur('${pg.id}',0,this)">${renderBodyHtml(botText)}</div>`
           : `<div class="page-content-area pg-row-text-placeholder" style="min-height:60px;border:1.5px dashed #e0e0d8;border-radius:2px;padding:8px 10px;" contenteditable="true" spellcheck="false" onblur="onRowTextBlur('${pg.id}',0,this)" data-placeholder="하단 텍스트 (클릭하여 입력)"></div>`
       }</div>`;
+    } else if (_isB) {
+      // 하단: 동일한 사이드 레이아웃 (이미지 + 텍스트)
+      const botSrc = imgs[1] || null;
+      const botCap = captions[1] || '';
+      const botH = getRowHeight(pg, 1);
+      const imgW2 = pg.sideImageWidth || 50;
+      const imgBlock2 = `<div class="pg-img-side" style="flex:0 0 ${imgW2}%;min-width:0;">
+        ${botSrc
+          ? `<img src="${botSrc}" alt="" style="width:100%;height:${botH}px;object-fit:${_imgFit};">`
+          : `<div class="pg-img-empty" style="height:${botH}px;"><span style="font-size:28px;opacity:.25;">🖼</span><span style="font-size:11px;color:#bbb;">이미지를 업로드하세요</span></div>`}
+        ${botCap ? `<div class="pg-img-caption">${esc(botCap)}</div>` : ''}
+      </div>`;
+      const hasSideTitle2 = pg.sideTitle2 && pg.sideTitle2.trim();
+      const textBlock2 = `<div class="pg-text-side" style="flex:1;min-width:0;">
+        ${hasSideTitle2 ? `
+          <div class="pg-side-title" contenteditable="true" spellcheck="false" onblur="onSideTitle2Blur('${pg.id}',this)">${esc(pg.sideTitle2)}</div>
+          <div class="pg-side-divider" style="background:${state.accentColor}"></div>
+        ` : `
+          <div class="pg-side-title" contenteditable="true" spellcheck="false" onblur="onSideTitle2Blur('${pg.id}',this)" style="display:none"></div>
+        `}
+        <div class="pg-side-body" contenteditable="true" spellcheck="false" onblur="onSideBody2Blur('${pg.id}',this)">${renderBodyHtml(pg.sideBody2||'텍스트를 입력하세요.\n\n제품 설명, 특징, 사양 등을 자유롭게 작성하세요.')}</div>
+      </div>`;
+      bottomImgHtml = `<div style="margin-top:14px;">
+        <div class="pg-images layout-${_baseLayout}" style="">
+          ${_baseLayout === 'img-left' ? imgBlock2 + textBlock2 : textBlock2 + imgBlock2}
+        </div>
+      </div>`;
     } else if (_hasBot) {
       const botSrc = imgs[1] || null;
       const botCap = captions[1] || '';
@@ -775,7 +802,7 @@ function buildImagePage(pg, idx) {
     }
 
     imgHtml = `<div style="flex:1;display:flex;flex-direction:column;">
-      <div class="pg-images layout-${_baseLayout}" style="flex:1;">
+      <div class="pg-images layout-${_baseLayout}" style="${_isB ? '' : 'flex:1;'}">
         ${_baseLayout === 'img-left' ? imgBlock + textBlock : textBlock + imgBlock}
       </div>
       ${bottomImgHtml}
@@ -976,6 +1003,14 @@ function onSideTitleBlur(id, el) {
 function onSideBodyBlur(id, el) {
   const pg = state.pages.find(p=>p.id===id);
   if (pg) pg.sideBody = el.innerHTML;
+}
+function onSideTitle2Blur(id, el) {
+  const pg = state.pages.find(p=>p.id===id);
+  if (pg) pg.sideTitle2 = el.innerText.trim();
+}
+function onSideBody2Blur(id, el) {
+  const pg = state.pages.find(p=>p.id===id);
+  if (pg) pg.sideBody2 = el.innerHTML;
 }
 function onBodyBottomBlur(id, el) {
   const pg = state.pages.find(p=>p.id===id);
@@ -1245,16 +1280,27 @@ function buildImagePanel(pg) {
   })();
 
   // side-layout text fields
+  const _isBLayout = layout === 'img-left-b' || layout === 'img-right-b';
   const sideTextHtml = isSideLayout ? `
     <div class="panel-section">
-      <div class="panel-heading">텍스트 영역</div>
+      <div class="panel-heading">${_isBLayout ? '상단 텍스트 영역' : '텍스트 영역'}</div>
       <div class="field-label">소제목</div>
       <input class="field-input" placeholder="소제목 (비워두면 숨김)" value="${esc(pg.sideTitle||'')}"
         oninput="state.pages[${idx}].sideTitle=this.value;renderCanvas()">
       <div class="field-label">본문 텍스트</div>
-      <textarea class="field-textarea" rows="10"
+      <textarea class="field-textarea" rows="${_isBLayout ? 5 : 10}"
         oninput="state.pages[${idx}].sideBody=this.value;renderCanvas()">${/<[a-zA-Z]/.test(pg.sideBody||'') ? '(캔버스에서 서식 편집 중)' : esc(pg.sideBody||'텍스트를 입력하세요.\n\n제품 설명, 특징, 사양 등을 자유롭게 작성하세요.')}</textarea>
-    </div>` : `
+    </div>
+    ${_isBLayout ? `
+    <div class="panel-section">
+      <div class="panel-heading">하단 텍스트 영역</div>
+      <div class="field-label">소제목</div>
+      <input class="field-input" placeholder="소제목 (비워두면 숨김)" value="${esc(pg.sideTitle2||'')}"
+        oninput="state.pages[${idx}].sideTitle2=this.value;renderCanvas()">
+      <div class="field-label">본문 텍스트</div>
+      <textarea class="field-textarea" rows="5"
+        oninput="state.pages[${idx}].sideBody2=this.value;renderCanvas()">${/<[a-zA-Z]/.test(pg.sideBody2||'') ? '(캔버스에서 서식 편집 중)' : esc(pg.sideBody2||'텍스트를 입력하세요.\n\n제품 설명, 특징, 사양 등을 자유롭게 작성하세요.')}</textarea>
+    </div>` : ''}` : `
     <div class="panel-section">
       <div class="panel-heading">텍스트 영역</div>
       <div class="field-label">이미지 위 텍스트 (선택)</div>
@@ -1524,6 +1570,8 @@ function setImgLayout(pageIdx, layout) {
   if (isSide && pg.sideTitle === undefined) pg.sideTitle = '';
   if (isSide && !pg.sideBody) pg.sideBody = '텍스트를 입력하세요.\n\n제품 설명, 특징, 사양 등을 자유롭게 작성하세요.';
   if ((layout === 'img-left-bt' || layout === 'img-right-bt') && !pg.rowTexts) pg.rowTexts = [];
+  if ((layout === 'img-left-b' || layout === 'img-right-b') && pg.sideTitle2 === undefined) pg.sideTitle2 = '';
+  if ((layout === 'img-left-b' || layout === 'img-right-b') && !pg.sideBody2) pg.sideBody2 = '텍스트를 입력하세요.\n\n제품 설명, 특징, 사양 등을 자유롭게 작성하세요.';
   // reset height to layout default when layout changes
   delete pg.imageHeight;
   delete pg.rowHeights;
