@@ -1206,6 +1206,8 @@ function buildImagePanel(pg) {
 
   // image upload slots
   let slotsHtml = '';
+  const _isFixedBottom = layout === 'img-left-b' || layout === 'img-right-b' || layout === 'img-left-bt' || layout === 'img-right-bt';
+  const _isFixedBottomImg = layout === 'img-left-b' || layout === 'img-right-b';
   // img-left/img-right: slot 0 = side image, slot 1 = bottom image (if hasBottomImage)
   const _sideHasBot = _isFixedBottomImg || pg.hasBottomImage;
   const baseSlotCount = isSideLayout
@@ -1246,8 +1248,6 @@ function buildImagePanel(pg) {
   }
 
   // img-left/img-right 전용: 이미지 가로폭 + 하단 이미지 토글
-  const _isFixedBottom = layout === 'img-left-b' || layout === 'img-right-b' || layout === 'img-left-bt' || layout === 'img-right-bt';
-  const _isFixedBottomImg = layout === 'img-left-b' || layout === 'img-right-b';
   const sideExtraHtml = isSideLayout ? (() => {
     const imgW = pg.sideImageWidth || 50;
     return `
