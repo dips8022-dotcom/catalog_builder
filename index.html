@@ -715,6 +715,11 @@ function buildImagePage(pg, idx) {
   const div = document.createElement('div');
   div.className = 'content-page';
   const layout = pg.imageLayout || '2';
+  const _isB  = layout === 'img-left-b'  || layout === 'img-right-b';
+  const _isBT = layout === 'img-left-bt' || layout === 'img-right-bt';
+  const _baseLayout = (_isB || _isBT)
+    ? (layout.startsWith('img-left') ? 'img-left' : 'img-right')
+    : layout;
   const imgs = pg.images || [];
   const captions = pg.captions || [];
 
@@ -724,7 +729,7 @@ function buildImagePage(pg, idx) {
   const _imgH_grid = getRowHeight(pg, 0);
   const _imgFit = pg.imageFit || 'cover';
 
-  if (layout === 'img-left' || layout === 'img-right') {
+  if (_baseLayout === 'img-left' || _baseLayout === 'img-right') {
     // ── Side-by-side: image + text ──
     const imgW = pg.sideImageWidth || 50; // %
     const src = imgs[0] || null;
@@ -746,21 +751,32 @@ function buildImagePage(pg, idx) {
       <div class="pg-side-body" contenteditable="true" spellcheck="false" onblur="onSideBodyBlur('${pg.id}',this)">${renderBodyHtml(pg.sideBody||'텍스트를 입력하세요.\n\n제품 설명, 특징, 사양 등을 자유롭게 작성하세요.')}</div>
     </div>`;
 
-    // 하단 이미지 (선택)
-    const botSrc = (pg.hasBottomImage && imgs[1]) ? imgs[1] : null;
-    const botCap = (pg.hasBottomImage && captions[1]) ? captions[1] : '';
-    const botH = getRowHeight(pg, 1);
-    const bottomImgHtml = pg.hasBottomImage ? `
+    // 하단 이미지 (_isB) 또는 텍스트 (_isBT) — 해당 레이아웃은 항상 하단 포함
+    const _hasBot = _isB || pg.hasBottomImage;
+    let bottomImgHtml = '';
+    if (_isBT) {
+      const botText = pg.rowTexts && pg.rowTexts[0];
+      bottomImgHtml = `<div style="margin-top:14px;">${
+        botText
+          ? `<div class="page-content-area" style="min-height:60px;" contenteditable="true" spellcheck="false" onblur="onRowTextBlur('${pg.id}',0,this)">${renderBodyHtml(botText)}</div>`
+          : `<div class="page-content-area pg-row-text-placeholder" style="min-height:60px;border:1.5px dashed #e0e0d8;border-radius:2px;padding:8px 10px;" contenteditable="true" spellcheck="false" onblur="onRowTextBlur('${pg.id}',0,this)" data-placeholder="하단 텍스트 (클릭하여 입력)"></div>`
+      }</div>`;
+    } else if (_hasBot) {
+      const botSrc = imgs[1] || null;
+      const botCap = captions[1] || '';
+      const botH = getRowHeight(pg, 1);
+      bottomImgHtml = `
       <div style="margin-top:14px;">
         ${botSrc
           ? `<img src="${botSrc}" alt="" style="width:100%;height:${botH}px;object-fit:${_imgFit};border-radius:2px;display:block;">`
           : `<div style="width:100%;height:${botH}px;background:#f0efe9;border-radius:2px;display:flex;align-items:center;justify-content:center;flex-direction:column;gap:8px;border:1.5px dashed #ddd;"><span style="font-size:28px;opacity:.25;">🖼</span><span style="font-size:11px;color:#bbb;">이미지를 업로드하세요</span></div>`}
         ${botCap ? `<div class="pg-img-caption">${esc(botCap)}</div>` : ''}
-      </div>` : '';
+      </div>`;
+    }
 
     imgHtml = `<div style="flex:1;display:flex;flex-direction:column;">
-      <div class="pg-images layout-${layout}" style="flex:1;">
-        ${layout === 'img-left' ? imgBlock + textBlock : textBlock + imgBlock}
+      <div class="pg-images layout-${_baseLayout}" style="flex:1;">
+        ${_baseLayout === 'img-left' ? imgBlock + textBlock : textBlock + imgBlock}
       </div>
       ${bottomImgHtml}
     </div>`;
@@ -1118,7 +1134,7 @@ function buildImagePanel(pg) {
   const layout = pg.imageLayout || '2';
   const imgs = pg.images || [];
   const captions = pg.captions || [];
-  const isSideLayout = layout === 'img-left' || layout === 'img-right';
+  const isSideLayout = layout === 'img-left' || layout === 'img-right' || layout === 'img-left-b' || layout === 'img-right-b' || layout === 'img-left-bt' || layout === 'img-right-bt';
 
   const wrap = document.createElement('div');
 
@@ -1137,6 +1153,10 @@ function buildImagePanel(pg) {
     { key: '3x3',       label: '3장×\n3단' },
     { key: 'img-left',  label: '🖼왼쪽\n글오른쪽' },
     { key: 'img-right', label: '글왼쪽\n🖼오른쪽' },
+    { key: 'img-left-b',  label: '🖼왼쪽글\n오른쪽+1단' },
+    { key: 'img-right-b', label: '글왼쪽🖼\n오른쪽+1단' },
+    { key: 'img-left-bt',  label: '🖼왼쪽글\n오른쪽+텍스트' },
+    { key: 'img-right-bt', label: '글왼쪽🖼\n오른쪽+텍스트' },
   ];
 
   const layoutBtns = `
@@ -1152,8 +1172,9 @@ function buildImagePanel(pg) {
   // image upload slots
   let slotsHtml = '';
   // img-left/img-right: slot 0 = side image, slot 1 = bottom image (if hasBottomImage)
+  const _sideHasBot = _isFixedBottomImg || pg.hasBottomImage;
   const baseSlotCount = isSideLayout
-    ? (pg.hasBottomImage ? 2 : 1)
+    ? (_sideHasBot ? 2 : 1)
     : layoutSlotCount(layout);
   const slotCount = baseSlotCount;
   for (let i = 0; i < slotCount; i++) {
@@ -1170,7 +1191,7 @@ function buildImagePanel(pg) {
   }
 
   // image height & fit controls
-  const rowCount = isSideLayout ? (pg.hasBottomImage ? 2 : 1) : layoutRowCount(layout);
+  const rowCount = isSideLayout ? (_sideHasBot ? 2 : 1) : layoutRowCount(layout);
   const curFit = pg.imageFit || 'cover';
 
   const _rowLabel = (r) => {
@@ -1190,6 +1211,8 @@ function buildImagePanel(pg) {
   }
 
   // img-left/img-right 전용: 이미지 가로폭 + 하단 이미지 토글
+  const _isFixedBottom = layout === 'img-left-b' || layout === 'img-right-b' || layout === 'img-left-bt' || layout === 'img-right-bt';
+  const _isFixedBottomImg = layout === 'img-left-b' || layout === 'img-right-b';
   const sideExtraHtml = isSideLayout ? (() => {
     const imgW = pg.sideImageWidth || 50;
     return `
@@ -1197,12 +1220,13 @@ function buildImagePanel(pg) {
       <input type="range" style="width:100%;accent-color:var(--primary);margin-bottom:6px;"
         min="20" max="80" step="5" value="${imgW}"
         oninput="setSideImageWidth(${idx},+this.value)">
+      ${_isFixedBottom ? '' : `
       <div style="display:flex;align-items:center;gap:8px;margin-top:4px;margin-bottom:4px;">
         <label style="font-size:12px;color:#555;cursor:pointer;display:flex;align-items:center;gap:6px;">
           <input type="checkbox" ${pg.hasBottomImage?'checked':''} onchange="toggleBottomImage(${idx})">
           하단 이미지 추가
         </label>
-      </div>`;
+      </div>`}`;
   })() : '';
 
   slotsHtml += sideExtraHtml + heightSliders + `
@@ -1443,6 +1467,8 @@ function onPageDragEnd() {
 }
 
 function layoutSlotCount(layout, pg) {
+  if (layout === 'img-left-b' || layout === 'img-right-b') return 2;
+  if (layout === 'img-left-bt' || layout === 'img-right-bt') return 1;
   if (layout === 'img-left' || layout === 'img-right') return (pg && pg.hasBottomImage) ? 2 : 1;
   if (layout === '2b') return 3;
   if (layout === '3b') return 4;
@@ -1457,7 +1483,7 @@ function defaultImgH(layout) {
   if (layout === '3') return 150;
   if (layout === '2b') return 170;
   if (layout === '3b') return 150;
-  if (layout === 'img-left' || layout === 'img-right') return 320;
+  if (layout === 'img-left' || layout === 'img-right' || layout === 'img-left-b' || layout === 'img-right-b' || layout === 'img-left-bt' || layout === 'img-right-bt') return 320;
   const m = layout.match(/^(\d+)x(\d+)$/);
   if (m) {
     const total = parseInt(m[1]) * parseInt(m[2]);
@@ -1468,7 +1494,8 @@ function defaultImgH(layout) {
 
 // 레이아웃별 행(단) 수
 function layoutRowCount(layout) {
-  if (layout === '2b' || layout === '3b') return 2;
+  if (layout === '2b' || layout === '3b' || layout === 'img-left-b' || layout === 'img-right-b') return 2;
+  if (layout === 'img-left-bt' || layout === 'img-right-bt') return 1;
   const m = layout.match(/^(\d+)x(\d+)$/);
   if (m) return parseInt(m[1]);
   return 1;
@@ -1477,7 +1504,7 @@ function layoutRowCount(layout) {
 // 행별 높이 (rowHeights 배열 우선, 없으면 imageHeight 레거시, 없으면 기본값)
 function getRowHeight(pg, rowIdx) {
   const layout = pg.imageLayout || '2';
-  const defH = layout === 'img-left' || layout === 'img-right' ? 320 : defaultImgH(layout);
+  const defH = (layout === 'img-left' || layout === 'img-right' || layout === 'img-left-b' || layout === 'img-right-b' || layout === 'img-left-bt' || layout === 'img-right-bt') ? 320 : defaultImgH(layout);
   if (pg.rowHeights && pg.rowHeights[rowIdx] !== undefined) return pg.rowHeights[rowIdx];
   if (pg.imageHeight !== undefined) return pg.imageHeight;
   return defH;
@@ -1487,7 +1514,7 @@ function setImgLayout(pageIdx, layout) {
   const pg = state.pages[pageIdx];
   if (!pg) return;
   pg.imageLayout = layout;
-  const isSide = layout === 'img-left' || layout === 'img-right';
+  const isSide = layout === 'img-left' || layout === 'img-right' || layout === 'img-left-b' || layout === 'img-right-b' || layout === 'img-left-bt' || layout === 'img-right-bt';
   const n = layoutSlotCount(layout, pg);
   if (!pg.images) pg.images = [];
   if (!pg.captions) pg.captions = [];
@@ -1496,6 +1523,7 @@ function setImgLayout(pageIdx, layout) {
   // init side text fields if needed
   if (isSide && pg.sideTitle === undefined) pg.sideTitle = '';
   if (isSide && !pg.sideBody) pg.sideBody = '텍스트를 입력하세요.\n\n제품 설명, 특징, 사양 등을 자유롭게 작성하세요.';
+  if ((layout === 'img-left-bt' || layout === 'img-right-bt') && !pg.rowTexts) pg.rowTexts = [];
   // reset height to layout default when layout changes
   delete pg.imageHeight;
   delete pg.rowHeights;
