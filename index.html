@@ -1309,15 +1309,16 @@ function buildImagePanel(pg) {
   })();
 
   // side-layout text fields
-  const _isBLayout = layout === 'img-left-b' || layout === 'img-right-b';
+  const _isBLayout  = layout === 'img-left-b'  || layout === 'img-right-b';
+  const _isBTLayout = layout === 'img-left-bt' || layout === 'img-right-bt';
   const sideTextHtml = isSideLayout ? `
     <div class="panel-section">
-      <div class="panel-heading">${_isBLayout ? '상단 텍스트 영역' : '텍스트 영역'}</div>
+      <div class="panel-heading">${(_isBLayout || _isBTLayout) ? '상단 텍스트 영역' : '텍스트 영역'}</div>
       <div class="field-label">소제목</div>
       <input class="field-input" placeholder="소제목 (비워두면 숨김)" value="${esc(pg.sideTitle||'')}"
         oninput="state.pages[${idx}].sideTitle=this.value;renderCanvas()">
       <div class="field-label">본문 텍스트</div>
-      <textarea class="field-textarea" rows="${_isBLayout ? 5 : 10}"
+      <textarea class="field-textarea" rows="${(_isBLayout || _isBTLayout) ? 5 : 10}"
         oninput="state.pages[${idx}].sideBody=this.value;renderCanvas()">${/<[a-zA-Z]/.test(pg.sideBody||'') ? '(캔버스에서 서식 편집 중)' : esc(pg.sideBody||'텍스트를 입력하세요.\n\n제품 설명, 특징, 사양 등을 자유롭게 작성하세요.')}</textarea>
     </div>
     ${_isBLayout ? `
@@ -1329,6 +1330,13 @@ function buildImagePanel(pg) {
       <div class="field-label">본문 텍스트</div>
       <textarea class="field-textarea" rows="5"
         oninput="state.pages[${idx}].sideBody2=this.value;renderCanvas()">${/<[a-zA-Z]/.test(pg.sideBody2||'') ? '(캔버스에서 서식 편집 중)' : esc(pg.sideBody2||'텍스트를 입력하세요.\n\n제품 설명, 특징, 사양 등을 자유롭게 작성하세요.')}</textarea>
+    </div>` : ''}
+    ${_isBTLayout ? `
+    <div class="panel-section">
+      <div class="panel-heading">하단 텍스트</div>
+      <textarea class="field-textarea" rows="5" placeholder="하단에 표시할 텍스트 (없으면 비워두세요)"
+        oninput="if(!state.pages[${idx}].rowTexts)state.pages[${idx}].rowTexts=[];state.pages[${idx}].rowTexts[0]=this.value;renderCanvas()">${/<[a-zA-Z]/.test((pg.rowTexts&&pg.rowTexts[0])||'') ? '(캔버스에서 서식 편집 중)' : esc((pg.rowTexts&&pg.rowTexts[0])||'')}</textarea>
+      <div class="field-hint">캔버스에서 직접 클릭하여 편집할 수도 있습니다.</div>
     </div>` : ''}` : `
     <div class="panel-section">
       <div class="panel-heading">텍스트 영역</div>
