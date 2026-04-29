@@ -214,8 +214,39 @@ body { font-family: Arial, 'Noto Sans KR', sans-serif; background: #e0e0dc; colo
 .pg-text-side .pg-side-divider { width: 32px; height: 2px; margin-bottom: 14px; }
 
 .pg-img-caption { font-size: 11px; color: var(--muted); text-align: center; font-style: italic; }
-.pg-row-text-placeholder:empty:before { content: attr(data-placeholder); color: #bbb; font-size: 12px; pointer-events: none; }
-.pg-row-text-placeholder:focus { border-color: rgba(100,149,237,.5) !important; outline: none; }
+/* 비어있을 때: 공간 없음, 테두리 없음 */
+.pg-row-text-placeholder:empty {
+  min-height: 0 !important;
+  padding: 0 !important;
+  margin-top: 0 !important;
+  margin-bottom: 0 !important;
+  border-color: transparent !important;
+}
+.pg-row-text-placeholder:empty:before { content: none; }
+/* hover시 클릭 유도 표시 */
+.pg-row-text-placeholder:empty:hover {
+  min-height: 24px !important;
+  padding: 3px 8px !important;
+  margin-top: 4px !important;
+  margin-bottom: 4px !important;
+  border: 1.5px dashed #d0d0c8 !important;
+  border-radius: 2px;
+  cursor: text;
+}
+.pg-row-text-placeholder:empty:hover:before {
+  content: attr(data-placeholder);
+  color: #ccc;
+  font-size: 11px;
+  pointer-events: none;
+  display: block;
+}
+/* 포커스시 편집 가능 표시 */
+.pg-row-text-placeholder:focus {
+  min-height: 24px !important;
+  padding: 3px 8px !important;
+  border-color: rgba(100,149,237,.5) !important;
+  outline: none;
+}
 
 /* pdf-image page (full bleed between header & footer) */
 .pdf-img-page { flex: 1; display: flex; flex-direction: column; min-height: var(--page-h); }
@@ -756,11 +787,9 @@ function buildImagePage(pg, idx) {
     let bottomImgHtml = '';
     if (_isBT) {
       const botText = pg.rowTexts && pg.rowTexts[0];
-      bottomImgHtml = `<div style="margin-top:18px;width:100%;">${
-        botText
-          ? `<div class="page-content-area" style="min-height:80px;width:100%;box-sizing:border-box;" contenteditable="true" spellcheck="false" onblur="onRowTextBlur('${pg.id}',0,this)">${renderBodyHtml(botText)}</div>`
-          : `<div class="page-content-area pg-row-text-placeholder" style="min-height:80px;width:100%;box-sizing:border-box;border:1.5px dashed #e0e0d8;border-radius:2px;padding:10px 12px;" contenteditable="true" spellcheck="false" onblur="onRowTextBlur('${pg.id}',0,this)" data-placeholder="하단 텍스트 (클릭하여 입력)"></div>`
-      }</div>`;
+      bottomImgHtml = botText
+        ? `<div class="page-content-area" style="margin-top:18px;min-height:80px;width:100%;box-sizing:border-box;" contenteditable="true" spellcheck="false" onblur="onRowTextBlur('${pg.id}',0,this)">${renderBodyHtml(botText)}</div>`
+        : `<div class="page-content-area pg-row-text-placeholder" style="width:100%;box-sizing:border-box;border-radius:2px;" contenteditable="true" spellcheck="false" onblur="onRowTextBlur('${pg.id}',0,this)" data-placeholder="하단 텍스트 (클릭하여 입력)"></div>`;
     } else if (_isB) {
       // 하단: 동일한 사이드 레이아웃 (이미지 + 텍스트)
       const botSrc = imgs[1] || null;
@@ -837,7 +866,7 @@ function buildImagePage(pg, idx) {
     topRow += '</div>';
     const midText = (pg.rowTexts && pg.rowTexts[0])
       ? `<div class="page-content-area" style="margin:8px 0;" contenteditable="true" spellcheck="false" onblur="onRowTextBlur('${pg.id}',0,this)">${renderBodyHtml(pg.rowTexts[0])}</div>`
-      : `<div class="page-content-area pg-row-text-placeholder" style="margin:4px 0;min-height:28px;border:1.5px dashed #e0e0d8;border-radius:2px;padding:6px 8px;color:#bbb;font-size:12px;" contenteditable="true" spellcheck="false" onblur="onRowTextBlur('${pg.id}',0,this)" data-placeholder="이미지 사이 텍스트 (클릭하여 입력)"></div>`;
+      : `<div class="page-content-area pg-row-text-placeholder" style="margin:4px 0;border-radius:2px;" contenteditable="true" spellcheck="false" onblur="onRowTextBlur('${pg.id}',0,this)" data-placeholder="이미지 사이 텍스트 (클릭하여 입력)"></div>`;
     const botItem = makeImgItem(imgs[topCount], captions[topCount] || '', getRowHeight(pg, 1));
     const gridHtml = `<div style="display:flex;flex-direction:column;gap:6px;">${topRow}${midText}${botItem}</div>`;
 
@@ -875,7 +904,7 @@ function buildImagePage(pg, idx) {
       // 행 사이 텍스트
       if (r < rows - 1) {
         const rt = pg.rowTexts && pg.rowTexts[r] ? pg.rowTexts[r] : '';
-        gridHtml += `<div class="page-content-area pg-row-text-placeholder" style="margin:2px 0;min-height:28px;${rt?'':'border:1.5px dashed #e0e0d8;padding:6px 8px;color:#bbb;font-size:12px;'}" contenteditable="true" spellcheck="false" onblur="onRowTextBlur('${pg.id}',${r},this)">${rt ? renderBodyHtml(rt) : ''}</div>`;
+        gridHtml += `<div class="page-content-area pg-row-text-placeholder" style="margin:2px 0;border-radius:2px;" contenteditable="true" spellcheck="false" onblur="onRowTextBlur('${pg.id}',${r},this)">${rt ? renderBodyHtml(rt) : ''}</div>`;
       }
     }
     gridHtml += '</div>';
